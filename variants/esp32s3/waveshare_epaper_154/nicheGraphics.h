@@ -19,6 +19,7 @@
 
 #include "EncoderInput.h"
 #include "NodePickerApplet.h"
+#include "WaypointCompassApplet.h"
 
 #include "NodeDB.h"
 #include "SinglePortModule.h"
@@ -182,7 +183,7 @@ void setupNicheGraphics()
     inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet("Radar", new InkHUD::RadarApplet, true);
-    inkhud->addApplet("Waypoints", new InkHUD::WaypointListApplet);
+    inkhud->addApplet("Waypoints", new InkHUD::WaypointCompassApplet); // same slot: stock list + compass
     inkhud->addApplet("Favorites Map", new InkHUD::FavoritesMapApplet);
     inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
     inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0);
