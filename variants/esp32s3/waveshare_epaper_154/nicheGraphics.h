@@ -168,14 +168,19 @@ void setupNicheGraphics()
     InkHUD::Applet::fontMedium = FREESANS_9PT;
     InkHUD::Applet::fontSmall = FREESANS_6PT;
 
+    // The encoder is the only input, so the joystick UI must always be on. begin() calls
+    // loadSettings() and would overwrite a plain default with the stored value, so load here,
+    // force it on, and persist once -- without clobbering other saved settings.
+    inkhud->persistence->loadSettings();
+    if (!inkhud->persistence->settings.joystick.enabled || !inkhud->persistence->settings.joystick.aligned) {
+        inkhud->persistence->settings.joystick.enabled = true;  // encoder drives nav
+        inkhud->persistence->settings.joystick.aligned = true;  // skip AlignStick: no 4-way to align
+        inkhud->persistence->settings.joystick.alignment = 0;
+        inkhud->persistence->saveSettings();
+    }
+
     inkhud->persistence->settings.userTiles.maxCount = 2;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
-
-    // Rotary encoder navigates InkHUD as a joystick (up/down + select).
-    // aligned=true skips the AlignStick screen: an encoder has no 4-way to align.
-    inkhud->persistence->settings.joystick.enabled = true;
-    inkhud->persistence->settings.joystick.aligned = true;
-    inkhud->persistence->settings.joystick.alignment = 0;
 
     inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true);
     inkhud->addApplet("DMs", new InkHUD::DMApplet);

@@ -17,6 +17,8 @@ it in nicheGraphics.h; this navigator does not change.
 
 #include "InputEvent.h"
 
+#include <cstring>
+
 #include "graphics/niche/InkHUD/Applet.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
 #include "graphics/niche/InkHUD/SystemApplet.h"
@@ -99,10 +101,14 @@ class InkHudNavigator
         }
     }
 
+    // Note: InkHUD::getSystemApplet() asserts if the name is missing, so look it up ourselves
+    // and treat "not present" (e.g. no keyboard) as "not in the foreground".
     bool foreground(InkHUD::InkHUD *h, const char *name)
     {
-        InkHUD::SystemApplet *sa = h->getSystemApplet(name);
-        return sa && sa->isForeground();
+        for (InkHUD::SystemApplet *sa : h->systemApplets)
+            if (sa->name && strcmp(sa->name, name) == 0)
+                return sa->isForeground();
+        return false;
     }
 };
 
