@@ -188,20 +188,22 @@ void setupNicheGraphics()
 
     inkhud->begin();
 
-    // Button #0 = BOOT (menu / back anchor), #1 = encoder push (select).
-    // All logic lives in EncoderInput so BOOT and the encoder stay in sync.
-    Inputs::EncoderInput *encoder = Inputs::EncoderInput::getInstance();
+    // Input layer: sources emit abstract events, InkHudNavigator maps them to InkHUD.
+    // Registering a source is this + its begin(); the navigator never changes.
+    Inputs::InkHudNavigator *nav = Inputs::InkHudNavigator::getInstance();
+
+    // Button source: #0 = BOOT (BACK), #1 = encoder push (SELECT).
     Inputs::TwoButton *buttons = Inputs::TwoButton::getInstance();
     buttons->setWiring(0, Inputs::TwoButton::getUserButtonPin(), true);
-    buttons->setHandlerShortPress(0, [encoder]() { encoder->bootShort(); });
-    buttons->setHandlerLongPress(0, [encoder]() { encoder->bootLong(); });
+    buttons->setHandlerShortPress(0, [nav]() { nav->dispatch(Inputs::InputEvent::BACK); });
+    buttons->setHandlerLongPress(0, [nav]() { nav->dispatch(Inputs::InputEvent::BACK, true); });
     buttons->setWiring(1, ENCODER_PIN_PRESS, true);
-    buttons->setHandlerShortPress(1, [encoder]() { encoder->pressShort(); });
-    buttons->setHandlerLongPress(1, [encoder]() { encoder->pressLong(); });
+    buttons->setHandlerShortPress(1, [nav]() { nav->dispatch(Inputs::InputEvent::SELECT); });
+    buttons->setHandlerLongPress(1, [nav]() { nav->dispatch(Inputs::InputEvent::SELECT, true); });
     buttons->start();
 
-    // Rotary encoder quadrature (A/B) -> contextual InkHUD navigation.
-    encoder->begin();
+    // Rotary encoder source: A/B quadrature -> UP/DOWN events.
+    Inputs::EncoderInput::getInstance()->begin();
 }
 
 #endif

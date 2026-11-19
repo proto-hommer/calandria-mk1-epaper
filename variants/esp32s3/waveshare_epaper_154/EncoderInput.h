@@ -6,31 +6,25 @@
 
 /*
 
-EC11 rotary encoder -> InkHUD navigation (variant-local input source).
+Input source: a hand-wired EC11 rotary encoder.
 
-InkHUD excludes the InputBroker, so this does not go through the standard
-Meshtastic encoder support. The A/B quadrature is decoded in a GPIO ISR; the
-decoded steps are turned into InkHUD nav calls from the OSThread (main loop),
-never from the ISR. The encoder push-button and the BOOT button are handled by
-the shared TwoButton input.
+Decodes the A/B quadrature in a GPIO ISR and emits abstract UP/DOWN events to
+InkHudNavigator from the OSThread (never from the ISR). The encoder push-button
+and BOOT are wired separately (in nicheGraphics.h) and emit SELECT / BACK, so
+this source only owns the rotation.
 
-Rotation is context aware (chosen with InkHUD's public API, no shared edits):
-  - a system applet (menu, keyboard, ...) is consuming input,  OR the foreground
-    user applet subscribes to NAV  -> turn = navDown / navUp
-  - otherwise (plain applet view)                              -> turn = next / prev applet
+It knows nothing about InkHUD: swapping in a different source (5-way joystick,
+I2C expander) is a new class plus a line in nicheGraphics.h, with no change to
+the navigator.
 
-Buttons:
-  - encoder press: short = select (shortpress), long = longpress (keyboard caps)
-  - BOOT:          keyboard -> send / cancel, menu -> close, elsewhere -> open menu
-
-Define ENCODER_SIM to drive it over the USB serial console without hardware.
+Define ENCODER_SIM to inject events over the USB serial console without hardware.
 
 */
 
+#include "InkHudNavigator.h"
+#include "InputEvent.h"
+
 #include "concurrency/OSThread.h"
-#include "graphics/niche/InkHUD/Applet.h"
-#include "graphics/niche/InkHUD/InkHUD.h"
-#include "graphics/niche/InkHUD/SystemApplet.h"
 
 namespace NicheGraphics::Inputs
 {
@@ -50,7 +44,7 @@ class EncoderInput : protected concurrency::OSThread
     // Wire the GPIOs and start polling. Call after InkHUD::begin().
     void begin()
     {
-        inkhud = InkHUD::InkHUD::getInstance();
+        nav = InkHudNavigator::getInstance();
 
         pinMode(ENCODER_PIN_A, INPUT_PULLUP);
         pinMode(ENCODER_PIN_B, INPUT_PULLUP);
@@ -63,57 +57,21 @@ class EncoderInput : protected concurrency::OSThread
         enabled = true;
     }
 
-    // Button handlers, wired to the shared TwoButton in nicheGraphics.h.
-    // Also reused by the serial simulator.
-    void pressShort() { inkhud->shortpress(); }
-    void pressLong() { inkhud->longpress(); }
-
-    void bootShort()
-    {
-        if (keyboardForeground()) {
-            inkhud->freeTextDone(); // BOOT = send inside the keyboard
-            inkhud->closeKeyboard();
-        } else if (menuForeground()) {
-            inkhud->exitShort(); // BOOT = close the menu
-        } else {
-            inkhud->openMenu(); // BOOT = open the menu
-        }
-    }
-
-    void bootLong()
-    {
-        if (keyboardForeground()) {
-            inkhud->freeTextCancel(); // long BOOT = discard the draft
-            inkhud->closeKeyboard();
-        } else {
-            inkhud->exitShort(); // long BOOT = back / close
-        }
-    }
-
-    // Clockwise = next / down, counter-clockwise = previous / up.
-    void rotate(bool clockwise)
-    {
-        if (navConsumerActive(clockwise))
-            clockwise ? inkhud->navDown() : inkhud->navUp();
-        else
-            clockwise ? inkhud->nextApplet() : inkhud->prevApplet();
-    }
-
   protected:
     int32_t runOnce() override
     {
 #ifdef ENCODER_SIM
         drainSerialSim();
 #endif
-        // Consume the steps the ISR decoded since last time.
+        // Emit the steps the ISR decoded since last time (clockwise = DOWN, counter = UP).
         int8_t steps = pendingSteps;
         pendingSteps = 0;
         while (steps > 0) {
-            rotate(true);
+            nav->dispatch(InputEvent::DOWN);
             steps--;
         }
         while (steps < 0) {
-            rotate(false);
+            nav->dispatch(InputEvent::UP);
             steps++;
         }
         return POLL_MS;
@@ -124,7 +82,7 @@ class EncoderInput : protected concurrency::OSThread
 
     EncoderInput() : OSThread("EncoderInput") {}
 
-    InkHUD::InkHUD *inkhud = nullptr;
+    InkHudNavigator *nav = nullptr;
     uint8_t quadState = 0b11; // last (A<<1 | B); rest state is 0b11 (both pulled up)
     int8_t quadAccum = 0;     // sub-step accumulator between detents
     volatile int8_t pendingSteps = 0;
@@ -148,63 +106,43 @@ class EncoderInput : protected concurrency::OSThread
         }
     }
 
-    // Mirror of Events.cpp: is any system applet currently consuming input?
-    bool systemAppletHandlingInput()
-    {
-        for (InkHUD::SystemApplet *sa : inkhud->systemApplets)
-            if (sa->handleInput)
-                return true;
-        return false;
-    }
-
-    bool navConsumerActive(bool clockwise)
-    {
-        if (systemAppletHandlingInput())
-            return true;
-        InkHUD::Applet *active = inkhud->getActiveApplet();
-        InkHUD::Applet::InputMask want = clockwise ? InkHUD::Applet::NAV_DOWN : InkHUD::Applet::NAV_UP;
-        return active && active->isInputSubscribed(want);
-    }
-
-    bool systemAppletForeground(const char *name)
-    {
-        InkHUD::SystemApplet *sa = inkhud->getSystemApplet(name);
-        return sa && sa->isForeground();
-    }
-    bool keyboardForeground() { return systemAppletForeground("Keyboard"); }
-    bool menuForeground() { return systemAppletForeground("Menu"); }
-
 #ifdef ENCODER_SIM
-    // Test-only: inject encoder events from the USB serial console.
-    //   d / .  turn clockwise (next / down)      a / ,  turn counter-clockwise (prev / up)
-    //   s / space / enter  encoder press         l      encoder long-press
-    //   m      BOOT short (menu)                  x      BOOT long (back)
+    // Test-only: inject events from the USB serial console.
+    //   d / .  DOWN      a / ,  UP        e  RIGHT      q  LEFT
+    //   s / space / enter  SELECT         l  SELECT (long)
+    //   m      BACK (BOOT short)          x  BACK (long)
     void drainSerialSim()
     {
         while (Serial.available()) {
             switch (Serial.read()) {
             case 'd':
             case '.':
-                rotate(true);
+                nav->dispatch(InputEvent::DOWN);
                 break;
             case 'a':
             case ',':
-                rotate(false);
+                nav->dispatch(InputEvent::UP);
+                break;
+            case 'e':
+                nav->dispatch(InputEvent::RIGHT);
+                break;
+            case 'q':
+                nav->dispatch(InputEvent::LEFT);
                 break;
             case 's':
             case ' ':
             case '\r':
             case '\n':
-                pressShort();
+                nav->dispatch(InputEvent::SELECT);
                 break;
             case 'l':
-                pressLong();
+                nav->dispatch(InputEvent::SELECT, true);
                 break;
             case 'm':
-                bootShort();
+                nav->dispatch(InputEvent::BACK);
                 break;
             case 'x':
-                bootLong();
+                nav->dispatch(InputEvent::BACK, true);
                 break;
             default:
                 break;
