@@ -287,6 +287,7 @@ void InkHUD::MenuApplet::onBackground()
     SystemApplet::handleInput = false;
 
     handleFreeText = false;
+    composePreset = false;
 
     // Restore the user applet whose tile we borrowed
     if (borrowedTileOwner)
@@ -2560,6 +2561,23 @@ void InkHUD::MenuApplet::onNavRight()
     }
 }
 
+void InkHUD::MenuApplet::composeTo(NodeNum dest, ChannelIndex channel)
+{
+    // The menu must already be in the foreground (openMenu). Jump straight to free-text entry
+    // for a fixed recipient, mirroring the FREE_TEXT menu action.
+    composePreset = true;
+    composeDest = dest;
+    composeChannel = channel;
+
+    OSThread::enabled = false;
+    handleFreeText = true;
+    cm.freeTextItem.rawText.erase();
+    freeTextMode = true;
+    if (supportsFreeTextKeyboard(inkhud, settings))
+        inkhud->openKeyboard();
+    requestUpdate(Drivers::EInk::UpdateTypes::FAST);
+}
+
 void InkHUD::MenuApplet::onFreeText(char c)
 {
     if (cm.freeTextItem.rawText.length() >= menuTextLimit && c != '\b')
@@ -2582,6 +2600,17 @@ void InkHUD::MenuApplet::onFreeTextDone()
     handleFreeText = false;
     freeTextMode = false;
 
+    // composeTo(): recipient is already fixed. Send and close, skipping the recipient page.
+    if (composePreset) {
+        if (!cm.freeTextItem.rawText.empty())
+            sendText(composeDest, composeChannel, cm.freeTextItem.rawText.c_str());
+        composePreset = false;
+        cm.freeTextItem.rawText.erase();
+        showPage(MenuPage::EXIT);
+        inkhud->forceUpdate(Drivers::EInk::UpdateTypes::FULL);
+        return;
+    }
+
     if (!cm.freeTextItem.rawText.empty()) {
         cm.selectedMessageItem = &cm.freeTextItem;
         showPage(MenuPage::CANNEDMESSAGE_RECIPIENT);
@@ -2600,6 +2629,12 @@ void InkHUD::MenuApplet::onFreeTextCancel()
 
     // Clear the free text message
     cm.freeTextItem.rawText.erase();
+
+    // composeTo(): nothing to choose after cancelling, so close the menu
+    if (composePreset) {
+        composePreset = false;
+        showPage(MenuPage::EXIT);
+    }
 
     requestUpdate(Drivers::EInk::UpdateTypes::FAST);
 }

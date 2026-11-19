@@ -18,6 +18,7 @@
 #include "graphics/niche/Inputs/TwoButton.h"
 
 #include "EncoderInput.h"
+#include "NodePickerApplet.h"
 
 #include "NodeDB.h"
 #include "SinglePortModule.h"
@@ -178,6 +179,7 @@ void setupNicheGraphics()
 
     inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true);
     inkhud->addApplet("DMs", new InkHUD::DMApplet);
+    inkhud->addApplet("Nodes", new InkHUD::NodePickerApplet, true);
     inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet("Radar", new InkHUD::RadarApplet, true);

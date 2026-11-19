@@ -41,6 +41,10 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     void show(Tile *t); // Open the menu, onto a user tile
     void setStartPage(MenuPage page);
 
+    // Compose a DM to a fixed node: skip the message/recipient pages, open the keyboard,
+    // and send on done. Call right after the menu is brought to the foreground (openMenu).
+    void composeTo(NodeNum dest, ChannelIndex channel);
+
   protected:
     Drivers::LatchingBacklight *backlight = nullptr; // Convenient access to the backlight singleton
 
@@ -74,6 +78,11 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     bool cursorShown = false;                 // Is *any* item highlighted? (Root menu: no initial selection)
     bool hideTouchSelectionHighlight = false; // Touch scrolling keeps cursor for paging math, but can hide highlight
     bool freeTextMode = false;
+
+    // composeTo(): send the free-text message to this fixed recipient, skipping the recipient page
+    bool composePreset = false;
+    NodeNum composeDest = 0;
+    ChannelIndex composeChannel = 0;
     uint16_t systemInfoPanelHeight = 0; // Need to know before we render
     uint16_t menuTextLimit = 200;
 
