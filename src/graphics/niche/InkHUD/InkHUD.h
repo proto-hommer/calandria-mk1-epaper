@@ -109,6 +109,10 @@ class InkHUD
     // Input mode hint for devices that use a left/right rocker plus center button
     bool twoWayRocker = false;
 
+    // Single-axis input (e.g. a rotary encoder): the on-screen keyboard steps through keys
+    // linearly (next/prev) instead of row/column, so one axis can reach every key
+    bool singleAxisKeyboard = false;
+
     // Set by an input source that detected a physical keyboard at runtime: the on-screen keyboard is never shown
     bool physicalKeyboard = false;
 

@@ -252,7 +252,9 @@ void InkHUD::KeyboardApplet::onExitLong()
 void InkHUD::KeyboardApplet::onNavUp()
 {
     if (!useTouchKeyboard()) {
-        if (selectedKey < KBD_COLS)
+        if (inkhud->singleAxisKeyboard)
+            selectedKey = (selectedKey + LEGACY_KBD_KEY_COUNT - 1) % LEGACY_KBD_KEY_COUNT;
+        else if (selectedKey < KBD_COLS)
             selectedKey += KBD_COLS * (LEGACY_KBD_ROWS - 1);
         else
             selectedKey -= KBD_COLS;
@@ -274,8 +276,12 @@ void InkHUD::KeyboardApplet::onNavUp()
 void InkHUD::KeyboardApplet::onNavDown()
 {
     if (!useTouchKeyboard()) {
-        selectedKey += KBD_COLS;
-        selectedKey %= LEGACY_KBD_KEY_COUNT;
+        if (inkhud->singleAxisKeyboard)
+            selectedKey = (selectedKey + 1) % LEGACY_KBD_KEY_COUNT;
+        else {
+            selectedKey += KBD_COLS;
+            selectedKey %= LEGACY_KBD_KEY_COUNT;
+        }
         requestUpdate(EInk::UpdateTypes::FAST, false);
         inkhud->forceUpdate(EInk::UpdateTypes::FAST);
         return;
@@ -290,7 +296,9 @@ void InkHUD::KeyboardApplet::onNavDown()
 void InkHUD::KeyboardApplet::onNavLeft()
 {
     if (!useTouchKeyboard()) {
-        if (selectedKey % KBD_COLS == 0)
+        if (inkhud->singleAxisKeyboard)
+            selectedKey = (selectedKey + LEGACY_KBD_KEY_COUNT - 1) % LEGACY_KBD_KEY_COUNT;
+        else if (selectedKey % KBD_COLS == 0)
             selectedKey += KBD_COLS - 1;
         else
             selectedKey--;
@@ -312,7 +320,9 @@ void InkHUD::KeyboardApplet::onNavLeft()
 void InkHUD::KeyboardApplet::onNavRight()
 {
     if (!useTouchKeyboard()) {
-        if (selectedKey % KBD_COLS == KBD_COLS - 1)
+        if (inkhud->singleAxisKeyboard)
+            selectedKey = (selectedKey + 1) % LEGACY_KBD_KEY_COUNT;
+        else if (selectedKey % KBD_COLS == KBD_COLS - 1)
             selectedKey -= KBD_COLS - 1;
         else
             selectedKey++;

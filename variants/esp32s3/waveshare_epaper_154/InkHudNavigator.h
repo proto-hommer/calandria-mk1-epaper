@@ -60,6 +60,9 @@ class InkHudNavigator
         }
     }
 
+    // Used by EncoderInput to decide when to defer the on-screen keyboard redraw.
+    bool keyboardForeground() { return foreground(InkHUD::InkHUD::getInstance(), "Keyboard"); }
+
   private:
     InkHudNavigator() = default;
 

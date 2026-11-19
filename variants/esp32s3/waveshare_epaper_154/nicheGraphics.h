@@ -179,6 +179,9 @@ void setupNicheGraphics()
         inkhud->persistence->saveSettings();
     }
 
+    // One encoder axis: the on-screen keyboard steps through keys linearly instead of 2D.
+    inkhud->singleAxisKeyboard = true;
+
     inkhud->persistence->settings.userTiles.maxCount = 2;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
 

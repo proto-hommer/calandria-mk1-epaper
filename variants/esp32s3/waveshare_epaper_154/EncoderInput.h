@@ -63,22 +63,38 @@ class EncoderInput : protected concurrency::OSThread
 #ifdef ENCODER_SIM
         drainSerialSim();
 #endif
-        // Emit the steps the ISR decoded since last time (clockwise = DOWN, counter = UP).
-        int8_t steps = pendingSteps;
+        // Pull whatever the ISR decoded since last time (clockwise = DOWN, counter = UP).
+        int8_t s = pendingSteps;
         pendingSteps = 0;
-        while (steps > 0) {
-            nav->dispatch(InputEvent::DOWN);
-            steps--;
+        if (s != 0) {
+            accumSteps += s;
+            lastStepMs = millis();
         }
-        while (steps < 0) {
-            nav->dispatch(InputEvent::UP);
-            steps++;
+
+        // Defer delivery only while the keyboard is foreground: the e-paper is too slow to
+        // redraw every key, so wait for the turning to settle, then move in one burst (InkHUD
+        // coalesces the redraws into one). Everywhere else, deliver immediately for a responsive feel.
+        if (accumSteps != 0) {
+            const bool defer = nav->keyboardForeground() && (millis() - lastStepMs) < KEYBOARD_COALESCE_MS;
+            if (!defer) {
+                int8_t d = accumSteps;
+                accumSteps = 0;
+                while (d > 0) {
+                    nav->dispatch(InputEvent::DOWN);
+                    d--;
+                }
+                while (d < 0) {
+                    nav->dispatch(InputEvent::UP);
+                    d++;
+                }
+            }
         }
         return POLL_MS;
     }
 
   private:
     static constexpr uint32_t POLL_MS = 20;
+    static constexpr uint32_t KEYBOARD_COALESCE_MS = ENCODER_KEYBOARD_COALESCE_MS;
 
     EncoderInput() : OSThread("EncoderInput") {}
 
@@ -86,6 +102,9 @@ class EncoderInput : protected concurrency::OSThread
     uint8_t quadState = 0b11; // last (A<<1 | B); rest state is 0b11 (both pulled up)
     int8_t quadAccum = 0;     // sub-step accumulator between detents
     volatile int8_t pendingSteps = 0;
+
+    int8_t accumSteps = 0;    // steps waiting to be delivered (coalesced for the keyboard)
+    uint32_t lastStepMs = 0;  // millis() of the most recent step, for the coalesce window
 
     static uint8_t readQuad() { return (digitalRead(ENCODER_PIN_A) << 1) | digitalRead(ENCODER_PIN_B); }
 

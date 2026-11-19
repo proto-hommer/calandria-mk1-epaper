@@ -45,6 +45,10 @@
 #define ENCODER_PIN_B 38
 #define ENCODER_PIN_PRESS 14
 
+// On-screen keyboard: accumulate encoder turns and redraw only this long after the last
+// click, so the slow e-paper refreshes once per burst instead of once per key.
+#define ENCODER_KEYBOARD_COALESCE_MS 200
+
 #define I2C_SDA 47
 #define I2C_SCL 48
 #define PCF85063_RTC 0x51
