@@ -168,26 +168,17 @@ void setupNicheGraphics()
     InkHUD::Applet::fontMedium = FREESANS_9PT;
     InkHUD::Applet::fontSmall = FREESANS_6PT;
 
-    // The encoder is the only input, so the joystick UI must always be on. begin() calls
-    // loadSettings() and would overwrite a plain default with the stored value, so load here,
-    // force it on, and persist once -- without clobbering other saved settings.
-    inkhud->persistence->loadSettings();
-    if (!inkhud->persistence->settings.joystick.enabled || !inkhud->persistence->settings.joystick.aligned) {
-        inkhud->persistence->settings.joystick.enabled = true;  // encoder drives nav
-        inkhud->persistence->settings.joystick.aligned = true;  // skip AlignStick: no 4-way to align
-        inkhud->persistence->settings.joystick.alignment = 0;
-        inkhud->persistence->saveSettings();
-    }
-
     // One encoder axis: the on-screen keyboard steps through keys linearly instead of 2D.
     inkhud->singleAxisKeyboard = true;
 
     inkhud->persistence->settings.userTiles.maxCount = 2;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
 
+    // ORDER MATTERS: saved settings (active / autoshow / tile assignment) are stored by applet
+    // INDEX. Never insert an applet in the middle -- it shifts every applet after it onto
+    // another one's saved flags. New applets go at the END.
     inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true);
     inkhud->addApplet("DMs", new InkHUD::DMApplet);
-    inkhud->addApplet("Nodes", new InkHUD::NodePickerApplet, true);
     inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
     inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet("Radar", new InkHUD::RadarApplet, true);
@@ -195,6 +186,20 @@ void setupNicheGraphics()
     inkhud->addApplet("Favorites Map", new InkHUD::FavoritesMapApplet);
     inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
     inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0);
+    inkhud->addApplet("Nodes", new InkHUD::NodePickerApplet, true); // index 9 (added with the encoder)
+
+    // The encoder is the only input, so the joystick UI must always be on. begin() calls
+    // loadSettings() and would overwrite a plain default with the stored value, so load here,
+    // force it on, and persist once. This must run AFTER addApplet() and maxCount: if nothing is
+    // stored, loadSettings() keeps the current settings (applet defaults included), so the file
+    // we save is complete instead of "every applet inactive".
+    inkhud->persistence->loadSettings();
+    if (!inkhud->persistence->settings.joystick.enabled || !inkhud->persistence->settings.joystick.aligned) {
+        inkhud->persistence->settings.joystick.enabled = true;  // encoder drives nav
+        inkhud->persistence->settings.joystick.aligned = true;  // skip AlignStick: no 4-way to align
+        inkhud->persistence->settings.joystick.alignment = 0;
+        inkhud->persistence->saveSettings();
+    }
 
     inkhud->begin();
 
