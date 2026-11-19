@@ -88,20 +88,35 @@ class InkHudNavigator
         return active && active->isInputSubscribed(want);
     }
 
-    // BACK is the BOOT-button role: inside the keyboard it sends (or cancels on long press),
-    // inside the menu it closes, and at the top level it opens the menu.
+    // BACK is the BOOT-button role ("menu / back"), distinct from SELECT (the applet's action):
+    //   keyboard:           short = send, long = cancel
+    //   long anywhere else: next tile (also closes the menu)
+    //   menu open:          close it
+    //   applet wants EXIT:  back out of it (e.g. leave the Nodes list)
+    //   otherwise:          open the menu
     void back(InkHUD::InkHUD *h, bool longPress)
     {
         if (foreground(h, "Keyboard")) {
             longPress ? h->freeTextCancel() : h->freeTextDone();
             h->closeKeyboard();
         } else if (longPress) {
-            h->exitShort();
+            h->nextTile();
         } else if (foreground(h, "Menu")) {
+            h->exitShort();
+        } else if (activeWants(h, InkHUD::Applet::EXIT_SHORT)) {
             h->exitShort();
         } else {
             h->openMenu();
         }
+    }
+
+    bool activeWants(InkHUD::InkHUD *h, InkHUD::Applet::InputMask mask)
+    {
+        for (InkHUD::SystemApplet *sa : h->systemApplets)
+            if (sa->handleInput)
+                return false; // a system applet owns input, not the user applet
+        InkHUD::Applet *active = h->getActiveApplet();
+        return active && active->isInputSubscribed(mask);
     }
 
     // Note: InkHUD::getSystemApplet() asserts if the name is missing, so look it up ourselves

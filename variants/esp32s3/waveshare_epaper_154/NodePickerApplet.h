@@ -9,10 +9,13 @@
 InkHUD applet: a scrollable, selectable list of mesh nodes.
 
 Encoder has a single axis, so this uses InkHUD's grab/release pattern (same as the
-UserAppletInputExample): a long-press toggles "browse" mode. While browsing, turning
-moves the cursor and a short-press opens the keyboard to DM the selected node (handed
-off to MenuApplet::composeTo). While not browsing, turning changes applet as usual, so
-you are never trapped in the list.
+UserAppletInputExample): encoder short-press enters "browse" mode. While browsing, turning
+moves the cursor, short-press opens the keyboard to DM the selected node (handed off to
+MenuApplet::composeTo), and BOOT (EXIT) or encoder long-press leaves the list. While not
+browsing, turning changes applet as usual, so you are never trapped in the list.
+
+The list is rebuilt from NodeDB every NODE_PICKER_REFRESH_MS (default 2 min) while the applet is
+on screen, keeping the cursor on the same node. It only redraws if the list actually changed.
 
 */
 
@@ -21,6 +24,11 @@ you are never trapped in the list.
 #include "graphics/niche/InkHUD/InkHUD.h"
 
 #include "NodeDB.h"
+#include "concurrency/OSThread.h"
+
+#ifndef NODE_PICKER_REFRESH_MS
+#define NODE_PICKER_REFRESH_MS (2 * 60 * 1000UL)
+#endif
 
 #include <string>
 #include <vector>
@@ -28,10 +36,19 @@ you are never trapped in the list.
 namespace NicheGraphics::InkHUD
 {
 
-class NodePickerApplet : public Applet
+class NodePickerApplet : public Applet, public concurrency::OSThread
 {
   public:
-    void onActivate() override { setGrabbed(false); }
+    NodePickerApplet() : concurrency::OSThread("NodePickerApplet") { OSThread::disable(); }
+
+    void onActivate() override
+    {
+        setGrabbed(false);
+        OSThread::enabled = true;
+        OSThread::setIntervalFromNow(NODE_PICKER_REFRESH_MS);
+    }
+
+    void onDeactivate() override { OSThread::disable(); }
 
     void onForeground() override
     {
@@ -77,17 +94,18 @@ class NodePickerApplet : public Applet
         drawScrollHints(scrollOffset > 0, (scrollOffset + rows) < nodes.size());
     }
 
-    void onButtonLongPress() override
-    {
-        setGrabbed(!grabbed);
-        requestUpdate(EInk::UpdateTypes::FAST);
-    }
-
     void onButtonShortPress() override
     {
-        if (grabbed)
+        if (grabbed) {
             compose();
+        } else {
+            setGrabbed(true);
+            requestUpdate(EInk::UpdateTypes::FAST);
+        }
     }
+
+    void onButtonLongPress() override { leaveList(); }
+    void onExitShort() override { leaveList(); }
 
     void onNavUp() override
     {
@@ -105,18 +123,44 @@ class NodePickerApplet : public Applet
         }
     }
 
+  protected:
+    // Periodic refresh. Only while on screen: onForeground() rebuilds anyway when we come back.
+    int32_t runOnce() override
+    {
+        if (isForeground()) {
+            const NodeNum selected = cursor < nodes.size() ? nodes[cursor] : 0;
+            const std::vector<NodeNum> before = nodes;
+            rebuild();
+            for (uint16_t i = 0; i < nodes.size(); i++)
+                if (nodes[i] == selected)
+                    cursor = i; // keep the highlight on the same node
+            if (nodes != before)
+                requestUpdate(EInk::UpdateTypes::FAST); // e-paper: redraw only on a real change
+        }
+        return NODE_PICKER_REFRESH_MS;
+    }
+
   private:
     std::vector<NodeNum> nodes;
     uint16_t cursor = 0;
     uint16_t scrollOffset = 0;
     bool grabbed = false;
 
-    // Grab the nav + select inputs only while browsing; always keep long-press to toggle.
+    // Short-press is always ours (enter list / DM). Nav, long-press and EXIT only while browsing,
+    // so outside the list turning changes applet and BOOT/long-press keep their InkHUD roles.
     void setGrabbed(bool g)
     {
         grabbed = g;
-        setInputsSubscribed(NAV_UP | NAV_DOWN | BUTTON_SHORT, g);
-        setInputsSubscribed(BUTTON_LONG, true);
+        setInputsSubscribed(BUTTON_SHORT, true);
+        setInputsSubscribed(NAV_UP | NAV_DOWN | BUTTON_LONG | EXIT_SHORT, g);
+    }
+
+    void leaveList()
+    {
+        if (!grabbed)
+            return;
+        setGrabbed(false);
+        requestUpdate(EInk::UpdateTypes::FAST);
     }
 
     void rebuild()
