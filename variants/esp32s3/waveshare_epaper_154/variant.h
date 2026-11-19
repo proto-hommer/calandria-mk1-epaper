@@ -38,6 +38,13 @@
 #define BUTTON_PIN 0
 #define BUTTON_NEED_PULLUP
 
+// EC11 rotary encoder (not yet soldered). Pins are the unused ES8311 I2S lines
+// (SCLK/LRCK/MCLK); audio is disabled so nothing else drives them. All active low,
+// read with the internal pull-ups. Never move these to GPIO19/20 (USB D-/D+).
+#define ENCODER_PIN_A 15
+#define ENCODER_PIN_B 38
+#define ENCODER_PIN_PRESS 14
+
 #define I2C_SDA 47
 #define I2C_SCL 48
 #define PCF85063_RTC 0x51

@@ -17,6 +17,8 @@
 #include "graphics/niche/Drivers/EInk/GDEY0154D67.h"
 #include "graphics/niche/Inputs/TwoButton.h"
 
+#include "EncoderInput.h"
+
 #include "NodeDB.h"
 #include "SinglePortModule.h"
 #include "gps/GeoCoord.h"
@@ -168,6 +170,12 @@ void setupNicheGraphics()
     inkhud->persistence->settings.userTiles.maxCount = 2;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
 
+    // Rotary encoder navigates InkHUD as a joystick (up/down + select).
+    // aligned=true skips the AlignStick screen: an encoder has no 4-way to align.
+    inkhud->persistence->settings.joystick.enabled = true;
+    inkhud->persistence->settings.joystick.aligned = true;
+    inkhud->persistence->settings.joystick.alignment = 0;
+
     inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true);
     inkhud->addApplet("DMs", new InkHUD::DMApplet);
     inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
@@ -180,11 +188,20 @@ void setupNicheGraphics()
 
     inkhud->begin();
 
+    // Button #0 = BOOT (menu / back anchor), #1 = encoder push (select).
+    // All logic lives in EncoderInput so BOOT and the encoder stay in sync.
+    Inputs::EncoderInput *encoder = Inputs::EncoderInput::getInstance();
     Inputs::TwoButton *buttons = Inputs::TwoButton::getInstance();
     buttons->setWiring(0, Inputs::TwoButton::getUserButtonPin(), true);
-    buttons->setHandlerShortPress(0, [inkhud]() { inkhud->shortpress(); });
-    buttons->setHandlerLongPress(0, [inkhud]() { inkhud->longpress(); });
+    buttons->setHandlerShortPress(0, [encoder]() { encoder->bootShort(); });
+    buttons->setHandlerLongPress(0, [encoder]() { encoder->bootLong(); });
+    buttons->setWiring(1, ENCODER_PIN_PRESS, true);
+    buttons->setHandlerShortPress(1, [encoder]() { encoder->pressShort(); });
+    buttons->setHandlerLongPress(1, [encoder]() { encoder->pressLong(); });
     buttons->start();
+
+    // Rotary encoder quadrature (A/B) -> contextual InkHUD navigation.
+    encoder->begin();
 }
 
 #endif
