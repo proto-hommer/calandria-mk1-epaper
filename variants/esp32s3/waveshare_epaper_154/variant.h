@@ -58,3 +58,9 @@
 #define BATTERY_PIN 4
 #define ADC_CHANNEL ADC_CHANNEL_3
 #define ADC_MULTIPLIER 2.0
+
+// Battery power latch (CLAUDE.md section 4). HIGH keeps VBAT connected to VSYS after PWR is
+// released; LOW is a real power-off. Driven + hold-latched in variant.cpp.
+#define BAT_CONTROL_PIN 17
+// PWR button, active LOW (10K pull-up to 3V3). Read only, not used yet.
+#define BAT_KEY_PIN 18
