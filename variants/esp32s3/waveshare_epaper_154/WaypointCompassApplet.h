@@ -92,7 +92,7 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor > 0) {
             cursor--;
-            requestUpdate(navUpdateType(), false);
+            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
         }
     }
 
@@ -100,7 +100,7 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor + 1 < waypointStore.getWaypoints().size()) {
             cursor++;
-            requestUpdate(navUpdateType(), false);
+            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
         }
     }
 

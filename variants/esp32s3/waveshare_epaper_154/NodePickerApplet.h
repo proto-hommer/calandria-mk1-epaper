@@ -147,7 +147,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         }
         if (cursor > 0) {
             cursor--;
-            requestUpdate(navUpdateType(), false);
+            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
         }
     }
 
@@ -159,7 +159,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         }
         if (cursor + 1 < nodes.size()) {
             cursor++;
-            requestUpdate(navUpdateType(), false);
+            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
         }
     }
 
@@ -249,7 +249,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         action = (action + 1) % ACTIONS; // two items: up and down both toggle
         notice.clear();
-        requestUpdate(EInk::UpdateTypes::FAST, false);
+        requestUpdate(EInk::UpdateTypes::FAST); // full render: clear the tile first (false = draw over the old frame)
     }
 
     StatusApplet *statusApplet(uint8_t *index)
@@ -290,7 +290,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         } else {
             notice = "No se pudo enviar";
         }
-        requestUpdate(EInk::UpdateTypes::FAST, false);
+        requestUpdate(EInk::UpdateTypes::FAST); // full render: clear the tile first (false = draw over the old frame)
     }
 
     void renderCard(NodeNum num)
