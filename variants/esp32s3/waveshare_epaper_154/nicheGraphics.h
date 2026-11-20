@@ -10,16 +10,20 @@
 #include "graphics/niche/InkHUD/Applets/User/DM/DMApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/FavoritesMap/FavoritesMapApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/Heard/HeardApplet.h"
+#include "graphics/niche/InkHUD/Applets/User/Positions/PositionsApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/RecentsList/RecentsListApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/ThreadedMessage/ThreadedMessageApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/Waypoints/WaypointListApplet.h"
 
 #include "graphics/niche/Drivers/EInk/GDEY0154D67.h"
+#include "graphics/niche/Inputs/CardKbInput.h"
 #include "graphics/niche/Inputs/TwoButton.h"
+#include "graphics/niche/Utils/FlashData.h"
 
 #include "AppletNames.h"
 #include "EncoderInput.h"
 #include "NodePickerApplet.h"
+#include "StatusApplet.h"
 #include "WaypointCompassApplet.h"
 
 #include "NodeDB.h"
@@ -145,6 +149,50 @@ class RadarApplet : public Applet, public SinglePortModule
 
 } // namespace NicheGraphics::InkHUD
 
+// One-time changes to SAVED applet settings, versioned in our own flash file so that afterwards the
+// user's menu choices are respected. Applets are looked up by name, never by hardcoded index.
+//  v1: "Nodes" absorbs Heard + Recents List (sorted by last heard, active count + divider), so hide
+//      those two; turn on the applets added at the end (Nodes, Positions, Estado), which saved
+//      settings from older firmware have as inactive; a tile showing Heard/Recents now shows Nodes.
+static void migrateAppletSettings(NicheGraphics::InkHUD::InkHUD *inkhud)
+{
+    using namespace NicheGraphics;
+    struct VariantState {
+        uint8_t version = 0;
+    } state;
+    constexpr uint8_t CURRENT = 1;
+    FlashData<VariantState>::load(&state, "wsepd154");
+    if (state.version >= CURRENT)
+        return;
+
+    auto indexOf = [inkhud](const char *name) -> int {
+        for (size_t i = 0; i < inkhud->userApplets.size(); i++)
+            if (inkhud->userApplets[i]->name && strcmp(inkhud->userApplets[i]->name, name) == 0)
+                return (int)i;
+        return -1;
+    };
+    auto &s = inkhud->persistence->settings;
+    const int nodes = indexOf(AppletNames::NODES);
+    for (const char *off : {AppletNames::HEARD, AppletNames::RECENTS}) {
+        const int i = indexOf(off);
+        if (i < 0)
+            continue;
+        s.userApplets.active[i] = false;
+        s.userApplets.autoshow[i] = false;
+        for (uint8_t &shown : s.userTiles.displayedUserApplet)
+            if (shown == i && nodes >= 0)
+                shown = (uint8_t)nodes;
+    }
+    for (const char *on : {AppletNames::NODES, AppletNames::POSITIONS, AppletNames::STATUS}) {
+        const int i = indexOf(on);
+        if (i >= 0)
+            s.userApplets.active[i] = true;
+    }
+    inkhud->persistence->saveSettings();
+    state.version = CURRENT;
+    FlashData<VariantState>::save(&state, "wsepd154");
+}
+
 void setupNicheGraphics()
 {
     using namespace NicheGraphics;
@@ -175,6 +223,8 @@ void setupNicheGraphics()
 
     inkhud->persistence->settings.userTiles.maxCount = 2;
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
+    // BOOT long already switches tile (like the joystick boards): keep the menu one item shorter
+    inkhud->persistence->settings.optionalMenuItems.nextTile = false;
 
     // ORDER MATTERS: saved settings (active / autoshow / tile assignment) are stored by applet
     // INDEX. Never insert an applet in the middle -- it shifts every applet after it onto
@@ -189,6 +239,12 @@ void setupNicheGraphics()
     inkhud->addApplet(AppletNames::RECENTS, new InkHUD::RecentsListApplet);
     inkhud->addApplet(AppletNames::HEARD, new InkHUD::HeardApplet, true, false, 0);
     inkhud->addApplet(AppletNames::NODES, new InkHUD::NodePickerApplet, true); // index 9 (added with the encoder)
+    inkhud->addApplet(AppletNames::POSITIONS, new InkHUD::PositionsApplet, true); // index 10: map of all nodes
+    inkhud->addApplet(AppletNames::STATUS, new InkHUD::StatusApplet, true);       // index 11: sensors / battery / radio / GPS
+
+    // Physical CardKB (I2C 0x5F, on the touch connector's SDA/SCL), like the Wio Tracker L1.
+    // Found by the boot I2C scan; with it attached the on-screen keyboard is never shown.
+    Inputs::CardKbInput::getInstance()->detect();
 
     // The encoder is the only input, so the joystick UI must always be on. begin() calls
     // loadSettings() and would overwrite a plain default with the stored value, so load here,
@@ -202,6 +258,7 @@ void setupNicheGraphics()
         inkhud->persistence->settings.joystick.alignment = 0;
         inkhud->persistence->saveSettings();
     }
+    migrateAppletSettings(inkhud);
 
     inkhud->begin();
 
@@ -221,6 +278,8 @@ void setupNicheGraphics()
 
     // Rotary encoder source: A/B quadrature -> UP/DOWN events.
     Inputs::EncoderInput::getInstance()->begin();
+
+    Inputs::CardKbInput::getInstance()->begin(); // no-op unless a CardKB was detected
 }
 
 #endif

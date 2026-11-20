@@ -17,4 +17,6 @@ constexpr const char *FAVORITES_MAP = "Favorites Map";
 constexpr const char *RECENTS = "Recents List";
 constexpr const char *HEARD = "Heard";
 constexpr const char *NODES = "Nodes";
+constexpr const char *POSITIONS = "Positions";
+constexpr const char *STATUS = "Estado";
 } // namespace NicheGraphics::AppletNames

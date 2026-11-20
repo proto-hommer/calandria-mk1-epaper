@@ -64,7 +64,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         (void)full;
         setFont(fontSmall);
-        drawHeader(grabbed ? "Nodes *" : "Nodes");
+        drawHeader(headerText());
 
         const int16_t top = getHeaderHeight() + 2;
         if (nodes.empty()) {
@@ -90,13 +90,23 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             if (sel)
                 drawSelection(y, rowH);
             setTextColor(BLACK);
-            const std::string age = ageFor(nodes[idx]);
+            // Right column: hops ("d" = heard directly, "2s" = 2 hops) + how long ago
+            std::string age = ageFor(nodes[idx]);
+            const std::string hops = hopsFor(nodes[idx]);
+            if (!hops.empty())
+                age = age.empty() ? hops : hops + " " + age;
             const uint16_t ageW = age.empty() ? 0 : getTextWidth(age) + 4;
             setCrop(0, y, width() - ageW, rowH); // long names never run into the age column
             printAt(2, y + 1, labelFor(nodes[idx]));
             resetCrop();
             if (!age.empty())
                 printAt(width() - 2, y + 1, age, RIGHT, TOP);
+
+            // Dotted line under the last "active" node (heard within the menu's Recents window):
+            // replaces the separate Heard / Recents List applets
+            if (idx + 1 < nodes.size() && isActive(nodes[idx]) && !isActive(nodes[idx + 1]))
+                for (int16_t x = 0; x < width(); x += 3)
+                    drawPixel(x, y + rowH - 1, BLACK);
         }
 
         drawScrollHints(scrollOffset > 0, (scrollOffset + rows) < nodes.size());
@@ -237,8 +247,39 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         std::string sig;
         for (NodeNum n : nodes)
-            sig += std::to_string(n) + ageFor(n) + ";";
+            sig += std::to_string(n) + ageFor(n) + hopsFor(n) + (isActive(n) ? "a" : "") + ";";
         return sig;
+    }
+
+    // Same "active" notion as the stock Recents List: heard within settings->recentlyActiveSeconds
+    // (set from the menu). Shown as a count in the header and a divider in the list.
+    bool isActive(NodeNum num)
+    {
+        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
+        return node && node->last_heard && sinceLastSeen(node) <= settings->recentlyActiveSeconds;
+    }
+
+    std::string headerText()
+    {
+        uint16_t active = 0;
+        for (NodeNum n : nodes)
+            if (isActive(n))
+                active++;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Nodes%s %u (%u act)", grabbed ? " *" : "", (unsigned)nodes.size(), (unsigned)active);
+        return buf;
+    }
+
+    std::string hopsFor(NodeNum num)
+    {
+        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
+        if (!node || !node->has_hops_away)
+            return "";
+        if (node->hops_away == 0)
+            return "d";
+        char buf[6];
+        snprintf(buf, sizeof(buf), "%us", (unsigned)node->hops_away);
+        return buf;
     }
 
     std::string labelFor(NodeNum num)
