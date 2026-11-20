@@ -30,6 +30,8 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 #define NODE_PICKER_REFRESH_MS (2 * 60 * 1000UL)
 #endif
 
+#include <algorithm>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -88,7 +90,13 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             if (sel)
                 fillRect(0, y, width(), rowH, BLACK);
             setTextColor(sel ? WHITE : BLACK);
+            const std::string age = ageFor(nodes[idx]);
+            const uint16_t ageW = age.empty() ? 0 : getTextWidth(age) + 4;
+            setCrop(0, y, width() - ageW, rowH); // long names never run into the age column
             printAt(2, y + 1, labelFor(nodes[idx]));
+            resetCrop();
+            if (!age.empty())
+                printAt(width() - 2, y + 1, age, RIGHT, TOP);
         }
 
         drawScrollHints(scrollOffset > 0, (scrollOffset + rows) < nodes.size());
@@ -129,13 +137,13 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         if (isForeground()) {
             const NodeNum selected = cursor < nodes.size() ? nodes[cursor] : 0;
-            const std::vector<NodeNum> before = nodes;
+            const std::string before = signature();
             rebuild();
             for (uint16_t i = 0; i < nodes.size(); i++)
                 if (nodes[i] == selected)
                     cursor = i; // keep the highlight on the same node
-            if (nodes != before)
-                requestUpdate(EInk::UpdateTypes::FAST); // e-paper: redraw only on a real change
+            if (signature() != before)
+                requestUpdate(EInk::UpdateTypes::FAST); // e-paper: redraw only on a visible change
         }
         return NODE_PICKER_REFRESH_MS;
     }
@@ -174,8 +182,40 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
                 continue;
             nodes.push_back(node->num);
         }
+        // Most recently heard first; never-heard (last_heard 0) at the end
+        std::stable_sort(nodes.begin(), nodes.end(), [](NodeNum a, NodeNum b) {
+            const meshtastic_NodeInfoLite *na = nodeDB->getMeshNode(a), *nb = nodeDB->getMeshNode(b);
+            return (na ? na->last_heard : 0) > (nb ? nb->last_heard : 0);
+        });
         if (cursor >= nodes.size())
             cursor = nodes.empty() ? 0 : (uint16_t)(nodes.size() - 1);
+    }
+
+    // Coarse "heard N ago": minutes < 1h, hours < 1 day, then days. Coarse on purpose, so the
+    // 2-minute refresh only repaints the panel when a label actually changes.
+    std::string ageFor(NodeNum num)
+    {
+        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
+        if (!node || !node->last_heard)
+            return "";
+        const uint32_t s = sinceLastSeen(node);
+        char buf[8];
+        if (s < 3600)
+            snprintf(buf, sizeof(buf), "%um", (unsigned)(s / 60));
+        else if (s < 86400)
+            snprintf(buf, sizeof(buf), "%uh", (unsigned)(s / 3600));
+        else
+            snprintf(buf, sizeof(buf), "%ud", (unsigned)(s / 86400));
+        return buf;
+    }
+
+    // What the screen shows (order + ages): redraw only when this changes
+    std::string signature()
+    {
+        std::string sig;
+        for (NodeNum n : nodes)
+            sig += std::to_string(n) + ageFor(n) + ";";
+        return sig;
     }
 
     std::string labelFor(NodeNum num)

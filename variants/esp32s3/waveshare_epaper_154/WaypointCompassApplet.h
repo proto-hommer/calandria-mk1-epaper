@@ -25,6 +25,7 @@ BOOT short or encoder long goes back one level.
 
 #include "GeoCoord.h"
 #include "NodeDB.h"
+#include "RTC.h"
 #include "WaypointStore.h"
 
 #include <algorithm>
@@ -187,7 +188,7 @@ class WaypointCompassApplet : public WaypointListApplet
         drawHeader(nameOf(w));
 
         const int16_t top = getHeaderHeight();
-        const int16_t textH = fontMedium.lineHeight() + fontSmall.lineHeight() + 6;
+        const int16_t textH = fontMedium.lineHeight() + 2 * fontSmall.lineHeight() + 8;
         const int16_t areaH = height() - top - textH;
         const int16_t cx = width() / 2;
         const int16_t cy = top + areaH / 2;
@@ -227,6 +228,9 @@ class WaypointCompassApplet : public WaypointListApplet
         printAt(cx, lineY, localizeDistance((uint32_t)lroundf(std::max(0.0f, meters))), CENTER, TOP);
         setFont(fontSmall);
         printAt(cx, lineY + fontMedium.lineHeight() + 2, parse(buf), CENTER, TOP);
+        // Our position comes from the phone (no GPS yet) and may be old: say how old, so a stale
+        // arrow isn't trusted blindly.
+        printAt(cx, lineY + fontMedium.lineHeight() + fontSmall.lineHeight() + 4, parse(positionAge(own)), CENTER, TOP);
     }
 
     // Arrow from the center toward `bearing` (screen y grows downward, so north = -y)
@@ -244,6 +248,24 @@ class WaypointCompassApplet : public WaypointListApplet
         fillTriangle(px(len, 0), py(len, 0), px(len - head, -half), py(len - head, -half), px(len - head, half),
                      py(len - head, half), BLACK);
         fillCircle(cx, cy, 2, BLACK);
+    }
+
+    std::string positionAge(const meshtastic_PositionLite &p)
+    {
+        const uint32_t now = getValidTime(RTCQuality::RTCQualityDevice);
+        if (!p.time || !now)
+            return "posición: hora desconocida";
+        const uint32_t s = now > p.time ? now - p.time : 0;
+        char buf[40];
+        if (s < 60)
+            snprintf(buf, sizeof(buf), "posición recién tomada");
+        else if (s < 3600)
+            snprintf(buf, sizeof(buf), "posición de hace %u min", (unsigned)(s / 60));
+        else if (s < 86400)
+            snprintf(buf, sizeof(buf), "posición de hace %u h", (unsigned)(s / 3600));
+        else
+            snprintf(buf, sizeof(buf), "posición de hace %u d", (unsigned)(s / 86400));
+        return buf;
     }
 
     static const char *cardinal(int deg)

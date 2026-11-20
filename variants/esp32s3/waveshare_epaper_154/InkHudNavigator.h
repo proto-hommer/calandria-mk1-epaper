@@ -15,8 +15,10 @@ it in nicheGraphics.h; this navigator does not change.
 
 */
 
+#include "AppletNames.h"
 #include "InputEvent.h"
 
+#include <Arduino.h>
 #include <cstdlib>
 #include <cstring>
 
@@ -78,13 +80,23 @@ class InkHudNavigator
     //   BOOT short also leaves scroll mode.
     // Our own applets (Nodes, Waypoints) subscribe BUTTON_SHORT and grab NAV only while
     // browsing, so they are handled by plain subscription.
+    // Scroll mode has no on-screen marker (stock applets draw their own header), so it ends by
+    // itself after NAV_SCROLL_TIMEOUT_MS without turning: you can't stay "lost" in it.
     InkHUD::Applet *scrollApplet = nullptr; // stock applet currently in scroll mode, if any
+    uint32_t scrollActivityMs = 0;
+
+    void setScroll(InkHUD::Applet *a)
+    {
+        scrollApplet = a;
+        scrollActivityMs = millis();
+    }
 
     void rotate(InkHUD::InkHUD *h, bool down)
     {
-        if (navConsumerActive(h, down))
+        if (navConsumerActive(h, down)) {
+            scrollActivityMs = millis(); // keep scroll mode alive while turning
             down ? h->navDown() : h->navUp();
-        else {
+        } else {
             scrollApplet = nullptr;
             down ? h->nextApplet() : h->prevApplet();
         }
@@ -107,7 +119,7 @@ class InkHudNavigator
         if (!active || !active->isInputSubscribed(want))
             return false;
         if (isStockScroller(active))
-            return scrollApplet == active;
+            return inScrollMode(h);
         return true;
     }
 
@@ -123,6 +135,8 @@ class InkHudNavigator
         InkHUD::Applet *active = h->getActiveApplet();
         if (scrollApplet && scrollApplet != active)
             scrollApplet = nullptr; // applet changed under us (autoshow, menu, ...)
+        if (scrollApplet && millis() - scrollActivityMs > NAV_SCROLL_TIMEOUT_MS)
+            scrollApplet = nullptr; // idle: back to "turn = change applet"
         return scrollApplet != nullptr;
     }
 
@@ -141,7 +155,7 @@ class InkHudNavigator
             return;
         }
         if (message || !longPress) { // toggle scroll mode
-            scrollApplet = (scrollApplet == active) ? nullptr : active;
+            setScroll(scrollApplet == active ? nullptr : active);
             return;
         }
         h->longpress(); // long press on a non-message stock applet: InkHUD default (menu)
@@ -151,7 +165,9 @@ class InkHudNavigator
 
     static bool isMessageApplet(InkHUD::Applet *a)
     {
-        return nameIs(a, "All Messages") || nameIs(a, "DMs") || (a->name && strncmp(a->name, "Channel ", 8) == 0);
+        using namespace AppletNames;
+        return nameIs(a, ALL_MESSAGES) || nameIs(a, DMS) ||
+               (a->name && strncmp(a->name, CHANNEL_PREFIX, CHANNEL_PREFIX_LEN) == 0);
     }
 
     // Reply to the latest message this applet shows: a DM goes back to its sender as a DM, a
@@ -162,8 +178,8 @@ class InkHudNavigator
         NodeNum dest;
         uint8_t channel;
         const bool haveDm = latest.dm.sender != 0, haveBc = latest.broadcast.sender != 0;
-        const bool all = nameIs(a, "All Messages");
-        if (nameIs(a, "DMs") || (all && haveDm && (!latest.wasBroadcast || !haveBc))) {
+        const bool all = nameIs(a, AppletNames::ALL_MESSAGES);
+        if (nameIs(a, AppletNames::DMS) || (all && haveDm && (!latest.wasBroadcast || !haveBc))) {
             if (!haveDm)
                 return false;
             dest = latest.dm.sender;
@@ -175,7 +191,7 @@ class InkHudNavigator
             channel = latest.broadcast.channelIndex;
         } else {
             dest = NODENUM_BROADCAST;
-            channel = (uint8_t)atoi(a->name + 8); // "Channel N"
+            channel = (uint8_t)atoi(a->name + AppletNames::CHANNEL_PREFIX_LEN); // "Channel N"
         }
         scrollApplet = nullptr;
         h->openMenu();

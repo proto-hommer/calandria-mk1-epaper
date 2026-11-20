@@ -352,6 +352,19 @@ void doDeepSleep(uint32_t msecToWake, bool skipPreflight = false, bool skipSaveN
     }
 #endif
 
+#ifdef BAT_CONTROL_PIN
+    // Boards whose battery power is held on by a firmware latch (Waveshare ESP32-S3-ePaper-1.54):
+    // "sleep forever" is an explicit shutdown, so release the latch for a real power-off on battery.
+    // On USB the board stays powered and falls through to deep sleep. Timed deep sleep keeps the latch.
+    if (msecToWake == portMAX_DELAY) {
+        LOG_INFO("Release battery power latch");
+        console->flush();
+        gpio_hold_dis((gpio_num_t)BAT_CONTROL_PIN);
+        digitalWrite(BAT_CONTROL_PIN, LOW);
+        delay(200);
+    }
+#endif
+
 #ifdef HAS_PMU
     if (pmu_found && PMU) {
         // Obsolete comment: from back when we we used to receive lora packets while CPU was in deep sleep.

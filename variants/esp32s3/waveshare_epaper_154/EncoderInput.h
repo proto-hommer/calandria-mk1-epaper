@@ -26,6 +26,8 @@ Define ENCODER_SIM to inject events over the USB serial console without hardware
 
 #include "concurrency/OSThread.h"
 
+#include <atomic>
+
 namespace NicheGraphics::Inputs
 {
 
@@ -64,8 +66,8 @@ class EncoderInput : protected concurrency::OSThread
         drainSerialSim();
 #endif
         // Pull whatever the ISR decoded since last time (clockwise = DOWN, counter = UP).
-        int8_t s = pendingSteps;
-        pendingSteps = 0;
+        // exchange() reads and clears in one step: an edge between a read and a clear is never lost.
+        int8_t s = (int8_t)pendingSteps.exchange(0);
         if (s != 0) {
             accumSteps += s;
             lastStepMs = millis();
@@ -101,7 +103,7 @@ class EncoderInput : protected concurrency::OSThread
     InkHudNavigator *nav = nullptr;
     uint8_t quadState = 0b11; // last (A<<1 | B); rest state is 0b11 (both pulled up)
     int8_t quadAccum = 0;     // sub-step accumulator between detents
-    volatile int8_t pendingSteps = 0;
+    std::atomic<int32_t> pendingSteps{0}; // written by the ISR, drained by runOnce (lock-free on S3)
 
     int8_t accumSteps = 0;    // steps waiting to be delivered (coalesced for the keyboard)
     uint32_t lastStepMs = 0;  // millis() of the most recent step, for the coalesce window
@@ -118,9 +120,9 @@ class EncoderInput : protected concurrency::OSThread
         // A detent completes when we land back on the rest state (both high).
         if (s == 0b11) {
             if (quadAccum >= 2)
-                pendingSteps++;
+                pendingSteps.fetch_add(1);
             else if (quadAccum <= -2)
-                pendingSteps--;
+                pendingSteps.fetch_sub(1);
             quadAccum = 0;
         }
     }

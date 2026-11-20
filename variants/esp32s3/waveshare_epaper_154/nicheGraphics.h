@@ -17,6 +17,7 @@
 #include "graphics/niche/Drivers/EInk/GDEY0154D67.h"
 #include "graphics/niche/Inputs/TwoButton.h"
 
+#include "AppletNames.h"
 #include "EncoderInput.h"
 #include "NodePickerApplet.h"
 #include "WaypointCompassApplet.h"
@@ -178,16 +179,16 @@ void setupNicheGraphics()
     // ORDER MATTERS: saved settings (active / autoshow / tile assignment) are stored by applet
     // INDEX. Never insert an applet in the middle -- it shifts every applet after it onto
     // another one's saved flags. New applets go at the END.
-    inkhud->addApplet("All Messages", new InkHUD::AllMessageApplet, true, true);
-    inkhud->addApplet("DMs", new InkHUD::DMApplet);
-    inkhud->addApplet("Channel 0", new InkHUD::ThreadedMessageApplet(0));
-    inkhud->addApplet("Channel 1", new InkHUD::ThreadedMessageApplet(1));
-    inkhud->addApplet("Radar", new InkHUD::RadarApplet, true);
-    inkhud->addApplet("Waypoints", new InkHUD::WaypointCompassApplet); // same slot: stock list + compass
-    inkhud->addApplet("Favorites Map", new InkHUD::FavoritesMapApplet);
-    inkhud->addApplet("Recents List", new InkHUD::RecentsListApplet);
-    inkhud->addApplet("Heard", new InkHUD::HeardApplet, true, false, 0);
-    inkhud->addApplet("Nodes", new InkHUD::NodePickerApplet, true); // index 9 (added with the encoder)
+    inkhud->addApplet(AppletNames::ALL_MESSAGES, new InkHUD::AllMessageApplet, true, true);
+    inkhud->addApplet(AppletNames::DMS, new InkHUD::DMApplet);
+    inkhud->addApplet(AppletNames::CHANNEL_0, new InkHUD::ThreadedMessageApplet(0));
+    inkhud->addApplet(AppletNames::CHANNEL_1, new InkHUD::ThreadedMessageApplet(1));
+    inkhud->addApplet(AppletNames::RADAR, new InkHUD::RadarApplet, true);
+    inkhud->addApplet(AppletNames::WAYPOINTS, new InkHUD::WaypointCompassApplet); // same slot: stock list + compass
+    inkhud->addApplet(AppletNames::FAVORITES_MAP, new InkHUD::FavoritesMapApplet);
+    inkhud->addApplet(AppletNames::RECENTS, new InkHUD::RecentsListApplet);
+    inkhud->addApplet(AppletNames::HEARD, new InkHUD::HeardApplet, true, false, 0);
+    inkhud->addApplet(AppletNames::NODES, new InkHUD::NodePickerApplet, true); // index 9 (added with the encoder)
 
     // The encoder is the only input, so the joystick UI must always be on. begin() calls
     // loadSettings() and would overwrite a plain default with the stored value, so load here,
