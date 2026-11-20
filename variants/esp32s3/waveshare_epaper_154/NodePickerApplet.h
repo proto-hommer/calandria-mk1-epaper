@@ -88,8 +88,8 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             const int16_t y = top + r * rowH;
             const bool sel = grabbed && idx == cursor;
             if (sel)
-                fillRect(0, y, width(), rowH, BLACK);
-            setTextColor(sel ? WHITE : BLACK);
+                drawSelection(y, rowH);
+            setTextColor(BLACK);
             const std::string age = ageFor(nodes[idx]);
             const uint16_t ageW = age.empty() ? 0 : getTextWidth(age) + 4;
             setCrop(0, y, width() - ageW, rowH); // long names never run into the age column
@@ -119,7 +119,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         if (cursor > 0) {
             cursor--;
-            requestUpdate(EInk::UpdateTypes::FAST, false);
+            requestUpdate(navUpdateType(), false);
         }
     }
 
@@ -127,7 +127,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         if (cursor + 1 < nodes.size()) {
             cursor++;
-            requestUpdate(EInk::UpdateTypes::FAST, false);
+            requestUpdate(navUpdateType(), false);
         }
     }
 
@@ -149,6 +149,29 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     }
 
   private:
+
+    // E-paper: a black highlight bar, inverted on every step, ghosts badly with partial refreshes.
+    // Use a double outline instead, and do a FULL refresh when the move scrolls to a new page
+    // (every row changes); moves inside the page stay FAST.
+    void drawSelection(int16_t y, uint16_t rowH)
+    {
+        drawRect(0, y, width(), rowH, BLACK);
+        drawRect(1, y + 1, width() - 2, rowH - 2, BLACK);
+    }
+
+    uint16_t listRows()
+    {
+        const int16_t top = getHeaderHeight() + 2;
+        const uint16_t rowH = fontSmall.lineHeight() + 2;
+        const uint16_t rows = (height() - top) / rowH;
+        return rows ? rows : 1;
+    }
+
+    EInk::UpdateTypes navUpdateType()
+    {
+        const bool pageTurn = cursor < scrollOffset || cursor >= scrollOffset + listRows();
+        return pageTurn ? EInk::UpdateTypes::FULL : EInk::UpdateTypes::FAST;
+    }
     std::vector<NodeNum> nodes;
     uint16_t cursor = 0;
     uint16_t scrollOffset = 0;
@@ -168,7 +191,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         if (!grabbed)
             return;
         setGrabbed(false);
-        requestUpdate(EInk::UpdateTypes::FAST);
+        requestUpdate(EInk::UpdateTypes::FULL); // clear any ghosting left by the list
     }
 
     void rebuild()

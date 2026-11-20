@@ -92,7 +92,7 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor > 0) {
             cursor--;
-            requestUpdate(EInk::UpdateTypes::FAST, false);
+            requestUpdate(navUpdateType(), false);
         }
     }
 
@@ -100,11 +100,34 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor + 1 < waypointStore.getWaypoints().size()) {
             cursor++;
-            requestUpdate(EInk::UpdateTypes::FAST, false);
+            requestUpdate(navUpdateType(), false);
         }
     }
 
   private:
+
+    // E-paper: a black highlight bar, inverted on every step, ghosts badly with partial refreshes.
+    // Use a double outline instead, and do a FULL refresh when the move scrolls to a new page
+    // (every row changes); moves inside the page stay FAST.
+    void drawSelection(int16_t y, uint16_t rowH)
+    {
+        drawRect(0, y, width(), rowH, BLACK);
+        drawRect(1, y + 1, width() - 2, rowH - 2, BLACK);
+    }
+
+    uint16_t listRows()
+    {
+        const int16_t top = getHeaderHeight() + 2;
+        const uint16_t rowH = fontSmall.lineHeight() + 2;
+        const uint16_t rows = (height() - top) / rowH;
+        return rows ? rows : 1;
+    }
+
+    EInk::UpdateTypes navUpdateType()
+    {
+        const bool pageTurn = cursor < scroll || cursor >= scroll + listRows();
+        return pageTurn ? EInk::UpdateTypes::FULL : EInk::UpdateTypes::FAST;
+    }
     enum Level { LIST, PICK, COMPASS };
     Level level = LIST;
     uint16_t cursor = 0;
@@ -174,8 +197,8 @@ class WaypointCompassApplet : public WaypointListApplet
             const int16_t y = top + r * rowH;
             const bool sel = i == cursor;
             if (sel)
-                fillRect(0, y, width(), rowH, BLACK);
-            setTextColor(sel ? WHITE : BLACK);
+                drawSelection(y, rowH);
+            setTextColor(BLACK);
             printAt(2, y + 1, nameOf(wps.at(i).waypoint));
         }
         setTextColor(BLACK);
