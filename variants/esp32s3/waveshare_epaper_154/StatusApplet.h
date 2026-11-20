@@ -15,8 +15,10 @@ InkHUD applet "Estado": everything about this node on one page.
   - Radio: direct neighbours and how well we hear the best one (SNR).
     "How well do they hear US" can't be inferred from what we receive: the only real
     measurement is a traceroute. Encoder short-press sends one to the most recently heard
-    direct neighbour; its reply carries the SNR at which it received us (snr_towards).
-    User-triggered only, with a cooldown, to keep airtime low.
+    direct neighbour (or Nodes -> a node -> "Medir senal" sends one to any node: traceTo()).
+    The reply carries the SNR at which each hop received the previous one (snr_towards); [0] is
+    the first node that heard us. User-triggered only, with a cooldown, to keep airtime low.
+  - Channel: channel utilisation and our own TX airtime (like BaseUI's LoRa screen).
   - GPS: connected? fix? satellites in view (module still pending: shows "no conectado").
 
 Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS while on screen.
@@ -32,6 +34,7 @@ Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS whil
 #include "RTC.h"
 #include "Router.h"
 #include "SinglePortModule.h"
+#include "airtime.h"
 #include "concurrency/OSThread.h"
 #include "mesh/generated/meshtastic/mesh.pb.h"
 #include "mesh/mesh-pb-constants.h"
@@ -46,7 +49,7 @@ Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS whil
 #ifndef STATUS_REFRESH_MS
 #define STATUS_REFRESH_MS (30 * 1000UL)
 #endif
-#define STATUS_TRACE_TIMEOUT_MS (60 * 1000UL)
+#define STATUS_TRACE_TIMEOUT_MS (90 * 1000UL) // multi-hop round trips are slow
 #define STATUS_TRACE_COOLDOWN_MS (30 * 1000UL)
 #define STATUS_SHTC3_ADDR 0x70
 
@@ -81,7 +84,47 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
         lastSignature.clear();
     }
 
-    void onButtonShortPress() override { startTrace(); }
+    void onButtonShortPress() override
+    {
+        uint16_t count;
+        float snr;
+        traceTo(bestDirectNeighbour(&count, &snr));
+    }
+
+    // Seconds until another traceroute is allowed (0 = now). Shared with the Nodes applet.
+    uint32_t traceWaitSeconds()
+    {
+        if (tracePending)
+            return (STATUS_TRACE_TIMEOUT_MS - (millis() - traceSentMs)) / 1000 + 1;
+        if (traceSentMs && millis() - traceSentMs < STATUS_TRACE_COOLDOWN_MS)
+            return (STATUS_TRACE_COOLDOWN_MS - (millis() - traceSentMs)) / 1000 + 1;
+        return 0;
+    }
+
+    // Send a traceroute to any node. False if one is already running / cooling down.
+    bool traceTo(NodeNum target)
+    {
+        if (!target || target == nodeDB->getNodeNum() || traceWaitSeconds())
+            return false; // airtime: one at a time, with a cooldown
+        meshtastic_MeshPacket *p = router->allocForSending();
+        if (!p)
+            return false;
+        p->to = target;
+        p->channel = nodeDB->getMeshNodeChannel(target);
+        p->decoded.portnum = meshtastic_PortNum_TRACEROUTE_APP;
+        p->decoded.want_response = true;
+        p->decoded.payload.size = 0; // empty RouteDiscovery: the route is filled in on the way
+        traceTarget = target;
+        traceId = p->id;
+        traceSentMs = millis();
+        tracePending = true;
+        traceFailed = false;
+        LOG_INFO("Estado: traceroute to 0x%08x to measure how we are heard", target);
+        service->sendToMesh(p, RX_SRC_LOCAL, false);
+        if (isForeground())
+            requestUpdate(EInk::UpdateTypes::FAST);
+        return true;
+    }
 
     void onRender(bool full) override
     {
@@ -129,12 +172,15 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
 
         meshtastic_RouteDiscovery rd = meshtastic_RouteDiscovery_init_zero;
         if (pb_decode_from_bytes(mp.decoded.payload.bytes, mp.decoded.payload.size, &meshtastic_RouteDiscovery_msg, &rd) &&
-            rd.snr_towards_count > 0 && rd.snr_towards[rd.snr_towards_count - 1] != INT8_MIN) {
-            heardUsSnr = rd.snr_towards[rd.snr_towards_count - 1] / 4.0f;
+            rd.snr_towards_count > 0 && rd.snr_towards[0] != INT8_MIN) {
+            // [0] = first node that received our request: a relay (route[0]) or the target itself
+            heardUsSnr = rd.snr_towards[0] / 4.0f;
             haveHeardUs = true;
         } else {
             haveHeardUs = false;
         }
+        traceHops = rd.route_count;
+        firstHop = rd.route_count ? rd.route[0] : traceTarget;
         weHearSnr = mp.rx_snr;
         traceResultMs = millis();
         tracePending = false;
@@ -155,6 +201,8 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
     PacketId traceId = 0;
     uint32_t traceSentMs = 0, traceResultMs = 0;
     float heardUsSnr = 0, weHearSnr = 0;
+    uint8_t traceHops = 0;  // relays between us and the target (0 = direct)
+    NodeNum firstHop = 0;   // who heard our request first
 
     std::string lastSignature;
 
@@ -224,33 +272,6 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
         return best;
     }
 
-    void startTrace()
-    {
-        if (tracePending || (traceSentMs && millis() - traceSentMs < STATUS_TRACE_COOLDOWN_MS))
-            return; // airtime: one at a time, with a cooldown
-        uint16_t count;
-        float snr;
-        const NodeNum target = bestDirectNeighbour(&count, &snr);
-        if (!target)
-            return;
-        meshtastic_MeshPacket *p = router->allocForSending();
-        if (!p)
-            return;
-        p->to = target;
-        p->channel = nodeDB->getMeshNodeChannel(target);
-        p->decoded.portnum = meshtastic_PortNum_TRACEROUTE_APP;
-        p->decoded.want_response = true;
-        p->decoded.payload.size = 0; // empty RouteDiscovery: the route is filled in on the way
-        traceTarget = target;
-        traceId = p->id;
-        traceSentMs = millis();
-        tracePending = true;
-        traceFailed = false;
-        LOG_INFO("Estado: traceroute to 0x%08x to measure how we are heard", target);
-        service->sendToMesh(p, RX_SRC_LOCAL, false);
-        requestUpdate(EInk::UpdateTypes::FAST);
-    }
-
     std::string shortName(NodeNum num)
     {
         meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(num);
@@ -309,17 +330,24 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
             l.push_back(fmt("Directos %u  mejor SNR %.1fdB", (unsigned)direct, bestSnr));
         else
             l.push_back("Sin vecinos directos");
+        if (airTime)
+            l.push_back(fmt("Canal %.0f%%  aire TX %.1f%%", airTime->channelUtilizationPercent(),
+                            airTime->utilizationTXPercent()));
 
         if (tracePending)
             l.push_back("Midiendo con " + shortName(traceTarget) + "...");
         else if (traceFailed)
             l.push_back(shortName(traceTarget) + ": sin respuesta");
         else if (traceResultMs) {
+            if (traceHops) // via relays: the first one is who actually heard OUR radio
+                l.push_back(fmt("%s: %u salto%s", shortName(traceTarget).c_str(), (unsigned)(traceHops + 1),
+                                traceHops ? "s" : ""));
             if (haveHeardUs)
-                l.push_back(fmt("%s nos oye %.1fdB", shortName(traceTarget).c_str(), heardUsSnr));
+                l.push_back(fmt("%s nos oye %.1fdB", shortName(firstHop).c_str(), heardUsSnr));
             else
-                l.push_back(shortName(traceTarget) + ": no informa SNR");
-            l.push_back(fmt("lo oímos %.1fdB  hace %s", weHearSnr, ago(millis() - traceResultMs).c_str()));
+                l.push_back(shortName(firstHop) + ": no informa SNR");
+            l.push_back(fmt("%s %.1fdB  hace %s", traceHops ? "resp." : "lo oímos", weHearSnr,
+                            ago(millis() - traceResultMs).c_str()));
         } else if (target)
             l.push_back("Pulsar: medir cómo nos oyen");
         l.push_back("");

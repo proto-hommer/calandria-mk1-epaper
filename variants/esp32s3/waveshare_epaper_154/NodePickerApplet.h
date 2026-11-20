@@ -10,8 +10,10 @@ InkHUD applet: a scrollable, selectable list of mesh nodes.
 
 Encoder has a single axis, so this uses InkHUD's grab/release pattern (same as the
 UserAppletInputExample): encoder short-press enters "browse" mode. While browsing, turning
-moves the cursor, short-press opens the keyboard to DM the selected node (handed off to
-MenuApplet::composeTo), and BOOT (EXIT) or encoder long-press leaves the list. While not
+moves the cursor and short-press opens the node's card: details (hops, SNR, last heard) and two
+actions, "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo) and "Medir senal"
+(traceroute via the Estado applet, which is then shown with the result). BOOT (EXIT) or encoder
+long-press goes back one level: card -> list -> normal applet navigation. While not
 browsing, turning changes applet as usual, so you are never trapped in the list.
 
 The list is rebuilt from NodeDB every NODE_PICKER_REFRESH_MS (default 2 min) while the applet is
@@ -20,7 +22,9 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 */
 
 #include "graphics/niche/InkHUD/Applet.h"
+#include "AppletNames.h"
 #include "MenuAppletInclude.h"
+#include "StatusApplet.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
 
 #include "NodeDB.h"
@@ -55,6 +59,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     void onForeground() override
     {
         setGrabbed(false);
+        card = false;
         rebuild();
         cursor = 0;
         scrollOffset = 0;
@@ -64,6 +69,10 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         (void)full;
         setFont(fontSmall);
+        if (card && cursor < nodes.size()) {
+            renderCard(nodes[cursor]);
+            return;
+        }
         drawHeader(headerText());
 
         const int16_t top = getHeaderHeight() + 2;
@@ -114,19 +123,28 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
 
     void onButtonShortPress() override
     {
-        if (grabbed) {
-            compose();
-        } else {
+        if (card) {
+            runAction();
+        } else if (grabbed && cursor < nodes.size()) {
+            card = true;
+            action = 0;
+            notice.clear();
+            requestUpdate(EInk::UpdateTypes::FULL); // whole screen changes
+        } else if (!grabbed) {
             setGrabbed(true);
             requestUpdate(EInk::UpdateTypes::FAST);
         }
     }
 
-    void onButtonLongPress() override { leaveList(); }
-    void onExitShort() override { leaveList(); }
+    void onButtonLongPress() override { back(); }
+    void onExitShort() override { back(); }
 
     void onNavUp() override
     {
+        if (card) {
+            moveAction();
+            return;
+        }
         if (cursor > 0) {
             cursor--;
             requestUpdate(navUpdateType(), false);
@@ -135,6 +153,10 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
 
     void onNavDown() override
     {
+        if (card) {
+            moveAction();
+            return;
+        }
         if (cursor + 1 < nodes.size()) {
             cursor++;
             requestUpdate(navUpdateType(), false);
@@ -145,7 +167,9 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     // Periodic refresh. Only while on screen: onForeground() rebuilds anyway when we come back.
     int32_t runOnce() override
     {
-        if (isForeground()) {
+        if (isForeground() && card) {
+            requestUpdate(EInk::UpdateTypes::FAST); // card: refresh "heard N ago" (nodes are not re-sorted)
+        } else if (isForeground()) {
             const NodeNum selected = cursor < nodes.size() ? nodes[cursor] : 0;
             const std::string before = signature();
             rebuild();
@@ -202,6 +226,112 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             return;
         setGrabbed(false);
         requestUpdate(EInk::UpdateTypes::FULL); // clear any ghosting left by the list
+    }
+
+    // ---------- Node card ----------
+    bool card = false;   // showing the selected node's card instead of the list
+    uint8_t action = 0;  // 0 = DM, 1 = traceroute
+    std::string notice;  // one-line feedback on the card ("espera 20s")
+    static constexpr uint8_t ACTIONS = 2;
+
+    // Card -> list -> out of the list
+    void back()
+    {
+        if (card) {
+            card = false;
+            requestUpdate(EInk::UpdateTypes::FULL);
+        } else {
+            leaveList();
+        }
+    }
+
+    void moveAction()
+    {
+        action = (action + 1) % ACTIONS; // two items: up and down both toggle
+        notice.clear();
+        requestUpdate(EInk::UpdateTypes::FAST, false);
+    }
+
+    StatusApplet *statusApplet(uint8_t *index)
+    {
+        for (size_t i = 0; i < inkhud->userApplets.size(); i++) {
+            Applet *a = inkhud->userApplets[i];
+            if (a && a->name && strcmp(a->name, AppletNames::STATUS) == 0) {
+                *index = (uint8_t)i;
+                return static_cast<StatusApplet *>(a); // our own applet, registered under this name
+            }
+        }
+        return nullptr;
+    }
+
+    void runAction()
+    {
+        if (cursor >= nodes.size())
+            return;
+        if (action == 0) {
+            card = false;
+            compose();
+            return;
+        }
+        uint8_t index = 0;
+        StatusApplet *st = statusApplet(&index);
+        if (!st) {
+            notice = "Sin applet Estado";
+        } else if (const uint32_t wait = st->traceWaitSeconds()) {
+            notice = "Espera " + std::to_string(wait) + "s";
+        } else if (st->traceTo(nodes[cursor])) {
+            if (st->isActive()) {
+                card = false;
+                setGrabbed(false);
+                inkhud->showApplet(index); // the result appears there
+                return;
+            }
+            notice = "Enviado: ver en Estado"; // Estado hidden from the menu: stay on the card
+        } else {
+            notice = "No se pudo enviar";
+        }
+        requestUpdate(EInk::UpdateTypes::FAST, false);
+    }
+
+    void renderCard(NodeNum num)
+    {
+        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
+        std::string title = labelFor(num);
+        drawHeader(title);
+        const uint16_t lineH = fontSmall.lineHeight() + 2;
+        int16_t y = getHeaderHeight() + 3;
+
+        std::string l1 = "Saltos: ";
+        if (!node || !node->has_hops_away)
+            l1 += "?";
+        else if (node->hops_away == 0)
+            l1 += "directo";
+        else
+            l1 += std::to_string(node->hops_away);
+        printAt(2, y, l1);
+        y += lineH;
+        if (node && node->has_hops_away && node->hops_away == 0) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "Lo oímos %.1f dB", node->snr);
+            printAt(2, y, parse(buf));
+            y += lineH;
+        }
+        const std::string age = ageFor(num);
+        printAt(2, y, age.empty() ? std::string("Nunca escuchado") : "Escuchado hace " + age);
+        y += lineH;
+        printAt(2, y, hexifyNodeNum(num));
+        y += lineH + 4;
+
+        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal"};
+        const uint16_t rowH = lineH + 2;
+        for (uint8_t i = 0; i < ACTIONS; i++) {
+            if (i == action)
+                drawSelection(y, rowH);
+            printAt(6, y + 2, parse(labels[i]));
+            y += rowH + 2;
+        }
+        if (!notice.empty())
+            printAt(2, y + 2, parse(notice));
     }
 
     void rebuild()
