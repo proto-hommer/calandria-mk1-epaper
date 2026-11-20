@@ -17,11 +17,15 @@ it in nicheGraphics.h; this navigator does not change.
 
 #include "InputEvent.h"
 
+#include <cstdlib>
 #include <cstring>
 
 #include "graphics/niche/InkHUD/Applet.h"
+#include "MenuAppletInclude.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
+#include "graphics/niche/InkHUD/Persistence.h"
 #include "graphics/niche/InkHUD/SystemApplet.h"
+#include "mesh/MeshTypes.h"
 
 namespace NicheGraphics::Inputs
 {
@@ -52,7 +56,7 @@ class InkHudNavigator
             h->navRight();
             break;
         case InputEvent::SELECT:
-            longPress ? h->longpress() : h->shortpress();
+            select(h, longPress);
             break;
         case InputEvent::BACK:
             back(h, longPress);
@@ -66,26 +70,120 @@ class InkHudNavigator
   private:
     InkHudNavigator() = default;
 
-    // UP/DOWN have no InkHUD fallback at the top level, so choose contextually: when a
-    // system applet (menu, keyboard, ...) or a NAV-subscribed applet is active, move the
-    // selection; otherwise switch applet. LEFT/RIGHT go straight to InkHUD, which already
-    // does the right thing (grid keyboard, and prev/next applet at the top level).
+    // Stock InkHUD applets (Heard, Recents, messages, ...) subscribe NAV permanently, to scroll.
+    // With one axis that would trap the encoder: turning would only ever scroll. So for those
+    // "stock scrollers" the turn changes applet, until the user enters SCROLL MODE:
+    //   messages (All/DMs/Channel N): encoder short = reply, encoder long = toggle scroll mode
+    //   other stock scrollers:        encoder short = toggle scroll mode
+    //   BOOT short also leaves scroll mode.
+    // Our own applets (Nodes, Waypoints) subscribe BUTTON_SHORT and grab NAV only while
+    // browsing, so they are handled by plain subscription.
+    InkHUD::Applet *scrollApplet = nullptr; // stock applet currently in scroll mode, if any
+
     void rotate(InkHUD::InkHUD *h, bool down)
     {
         if (navConsumerActive(h, down))
             down ? h->navDown() : h->navUp();
-        else
+        else {
+            scrollApplet = nullptr;
             down ? h->nextApplet() : h->prevApplet();
+        }
     }
 
-    bool navConsumerActive(InkHUD::InkHUD *h, bool down)
+    bool systemOwnsInput(InkHUD::InkHUD *h)
     {
         for (InkHUD::SystemApplet *sa : h->systemApplets)
             if (sa->handleInput)
                 return true;
+        return false;
+    }
+
+    bool navConsumerActive(InkHUD::InkHUD *h, bool down)
+    {
+        if (systemOwnsInput(h))
+            return true;
         InkHUD::Applet *active = h->getActiveApplet();
         InkHUD::Applet::InputMask want = down ? InkHUD::Applet::NAV_DOWN : InkHUD::Applet::NAV_UP;
-        return active && active->isInputSubscribed(want);
+        if (!active || !active->isInputSubscribed(want))
+            return false;
+        if (isStockScroller(active))
+            return scrollApplet == active;
+        return true;
+    }
+
+    // Subscribes NAV but has no action of its own on the button
+    bool isStockScroller(InkHUD::Applet *a)
+    {
+        return (a->isInputSubscribed(InkHUD::Applet::NAV_UP) || a->isInputSubscribed(InkHUD::Applet::NAV_DOWN)) &&
+               !a->isInputSubscribed(InkHUD::Applet::BUTTON_SHORT);
+    }
+
+    bool inScrollMode(InkHUD::InkHUD *h)
+    {
+        InkHUD::Applet *active = h->getActiveApplet();
+        if (scrollApplet && scrollApplet != active)
+            scrollApplet = nullptr; // applet changed under us (autoshow, menu, ...)
+        return scrollApplet != nullptr;
+    }
+
+    void select(InkHUD::InkHUD *h, bool longPress)
+    {
+        InkHUD::Applet *active = h->getActiveApplet();
+        if (systemOwnsInput(h) || !active || !isStockScroller(active)) {
+            longPress ? h->longpress() : h->shortpress();
+            return;
+        }
+        inScrollMode(h); // drop a stale scroll target
+        const bool message = isMessageApplet(active);
+        if (message && !longPress) {
+            if (!reply(h, active))
+                h->shortpress(); // nothing to reply to: InkHUD default (menu)
+            return;
+        }
+        if (message || !longPress) { // toggle scroll mode
+            scrollApplet = (scrollApplet == active) ? nullptr : active;
+            return;
+        }
+        h->longpress(); // long press on a non-message stock applet: InkHUD default (menu)
+    }
+
+    static bool nameIs(InkHUD::Applet *a, const char *n) { return a->name && strcmp(a->name, n) == 0; }
+
+    static bool isMessageApplet(InkHUD::Applet *a)
+    {
+        return nameIs(a, "All Messages") || nameIs(a, "DMs") || (a->name && strncmp(a->name, "Channel ", 8) == 0);
+    }
+
+    // Reply to the latest message this applet shows: a DM goes back to its sender as a DM, a
+    // channel message is answered on that channel. Reuses MenuApplet::composeTo (keyboard + send).
+    bool reply(InkHUD::InkHUD *h, InkHUD::Applet *a)
+    {
+        const auto &latest = h->persistence->latestMessage;
+        NodeNum dest;
+        uint8_t channel;
+        const bool haveDm = latest.dm.sender != 0, haveBc = latest.broadcast.sender != 0;
+        const bool all = nameIs(a, "All Messages");
+        if (nameIs(a, "DMs") || (all && haveDm && (!latest.wasBroadcast || !haveBc))) {
+            if (!haveDm)
+                return false;
+            dest = latest.dm.sender;
+            channel = latest.dm.channelIndex;
+        } else if (all) {
+            if (!haveBc)
+                return false;
+            dest = NODENUM_BROADCAST;
+            channel = latest.broadcast.channelIndex;
+        } else {
+            dest = NODENUM_BROADCAST;
+            channel = (uint8_t)atoi(a->name + 8); // "Channel N"
+        }
+        scrollApplet = nullptr;
+        h->openMenu();
+        InkHUD::MenuApplet *menu = (InkHUD::MenuApplet *)h->getSystemApplet("Menu");
+        if (!menu)
+            return false;
+        menu->composeTo(dest, channel);
+        return true;
     }
 
     // BACK is the BOOT-button role ("menu / back"), distinct from SELECT (the applet's action):
@@ -105,6 +203,8 @@ class InkHudNavigator
             h->exitShort();
         } else if (activeWants(h, InkHUD::Applet::EXIT_SHORT)) {
             h->exitShort();
+        } else if (inScrollMode(h)) {
+            scrollApplet = nullptr; // leave scroll mode instead of opening the menu
         } else {
             h->openMenu();
         }

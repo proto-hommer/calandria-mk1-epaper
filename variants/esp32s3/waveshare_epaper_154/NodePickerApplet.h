@@ -20,7 +20,7 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 */
 
 #include "graphics/niche/InkHUD/Applet.h"
-#include "graphics/niche/InkHUD/Applets/System/Menu/MenuApplet.h"
+#include "MenuAppletInclude.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
 
 #include "NodeDB.h"
