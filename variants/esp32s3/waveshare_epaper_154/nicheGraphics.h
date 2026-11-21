@@ -193,6 +193,31 @@ static void migrateAppletSettings(NicheGraphics::InkHUD::InkHUD *inkhud)
     FlashData<VariantState>::save(&state, "wsepd154");
 }
 
+// Heard and Recents List duplicate "Nodes" (same nodes, same order, less info). The one-time v1
+// migration hid them, but they can come back (menu, or a settings reset back to the defaults), so
+// keep them off on every boot. They stay registered: removing them would shift the saved indexes.
+static void hideRedundantApplets(NicheGraphics::InkHUD::InkHUD *inkhud)
+{
+    using namespace NicheGraphics;
+    auto &s = inkhud->persistence->settings;
+    int nodes = -1;
+    for (size_t i = 0; i < inkhud->userApplets.size(); i++)
+        if (inkhud->userApplets[i]->name && strcmp(inkhud->userApplets[i]->name, AppletNames::NODES) == 0)
+            nodes = (int)i;
+    for (size_t i = 0; i < inkhud->userApplets.size(); i++) {
+        const char *n = inkhud->userApplets[i]->name;
+        if (!n || (strcmp(n, AppletNames::HEARD) != 0 && strcmp(n, AppletNames::RECENTS) != 0))
+            continue;
+        s.userApplets.active[i] = false;
+        s.userApplets.autoshow[i] = false;
+        for (uint8_t &shown : s.userTiles.displayedUserApplet)
+            if (shown == i && nodes >= 0)
+                shown = (uint8_t)nodes;
+    }
+    if (nodes >= 0)
+        s.userApplets.active[nodes] = true;
+}
+
 void setupNicheGraphics()
 {
     using namespace NicheGraphics;
@@ -259,6 +284,7 @@ void setupNicheGraphics()
         inkhud->persistence->saveSettings();
     }
     migrateAppletSettings(inkhud);
+    hideRedundantApplets(inkhud);
 
     inkhud->begin();
 

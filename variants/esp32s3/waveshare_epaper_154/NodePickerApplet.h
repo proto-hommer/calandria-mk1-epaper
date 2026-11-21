@@ -319,7 +319,10 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         const std::string age = ageFor(num);
         printAt(2, y, age.empty() ? std::string("Nunca escuchado") : "Escuchado hace " + age);
         y += lineH;
-        printAt(2, y, hexifyNodeNum(num));
+        std::string id = hexifyNodeNum(num);
+        if (node && nodeInfoLiteHasUser(node) && node->short_name[0])
+            id = parseShortName((meshtastic_NodeInfoLite *)node) + "   " + id; // what Heard showed big
+        printAt(2, y, id);
         y += lineH + 4;
 
         const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal"};

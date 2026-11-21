@@ -193,6 +193,7 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
   private:
     // SHTC3
     bool haveSensor = false;
+    const char *sensorErr = "sin lectura"; // which step failed: shown on screen + logged
     float tempC = NAN, humidity = NAN;
 
     // Traceroute ("how do they hear us")
@@ -229,23 +230,35 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
     void readSensor()
     {
         haveSensor = false;
-        if (!shtcCommand(0x3517)) // wake (also tells us the chip is there)
-            return;
-        delayMicroseconds(300);
-        if (!shtcCommand(0x7866)) // measure, T first, normal mode
-            return;
+        // Wake (also tells us the chip is there). The first command after sleep can be NACKed while
+        // the chip powers up its interface, so retry once.
+        if (!shtcCommand(0x3517)) {
+            delay(1);
+            if (!shtcCommand(0x3517))
+                return sensorFail("no responde en 0x70");
+        }
+        delayMicroseconds(300); // wake-up time: max 240 us
+        if (!shtcCommand(0x7866)) // measure, T first, no clock stretching, normal mode
+            return sensorFail("rechazó la medición");
         delay(15); // max 12.1 ms in normal mode
         uint8_t b[6];
         if (Wire.requestFrom((uint8_t)STATUS_SHTC3_ADDR, (uint8_t)6) != 6)
-            return;
+            return sensorFail("lectura incompleta");
         for (uint8_t &v : b)
             v = Wire.read();
         shtcCommand(0xB098); // back to sleep
         if (crc8(b) != b[2] || crc8(b + 3) != b[5])
-            return;
+            return sensorFail("error de CRC");
         tempC = -45.0f + 175.0f * (float)((b[0] << 8) | b[1]) / 65536.0f;
         humidity = 100.0f * (float)((b[3] << 8) | b[4]) / 65536.0f;
         haveSensor = true;
+    }
+
+    void sensorFail(const char *why)
+    {
+        if (sensorErr != why)
+            LOG_WARN("Estado: SHTC3 %s", why);
+        sensorErr = why;
     }
 
     // ---------- Radio ----------
@@ -300,7 +313,7 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
         std::vector<std::string> l;
 
         // Ambient
-        l.push_back(haveSensor ? fmt("Temp %.1f°C   Hum %.0f%%", tempC, humidity) : "Sensor SHTC3: sin lectura");
+        l.push_back(haveSensor ? fmt("Temp %.1f°C   Hum %.0f%%", tempC, humidity) : std::string("SHTC3: ") + sensorErr);
 
         // Battery
         if (powerStatus && powerStatus->getHasBattery()) {
