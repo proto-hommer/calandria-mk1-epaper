@@ -10,9 +10,10 @@ InkHUD applet: a scrollable, selectable list of mesh nodes.
 
 Encoder has a single axis, so this uses InkHUD's grab/release pattern (same as the
 UserAppletInputExample): encoder short-press enters "browse" mode. While browsing, turning
-moves the cursor and short-press opens the node's card: details (hops, SNR, last heard) and two
-actions, "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo) and "Medir senal"
-(traceroute via the Estado applet, which is then shown with the result). BOOT (EXIT) or encoder
+moves the cursor and short-press opens the node's card: details (hops, SNR, last heard, distance
+and direction) and three actions: "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo),
+"Medir senal" (traceroute via the Estado applet, which is then shown with the result) and "Radar"
+(the Radar applet locked onto this node: arrow + distance). BOOT (EXIT) or encoder
 long-press goes back one level: card -> list -> normal applet navigation. While not
 browsing, turning changes applet as usual, so you are never trapped in the list.
 
@@ -24,6 +25,7 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 #include "graphics/niche/InkHUD/Applet.h"
 #include "AppletNames.h"
 #include "MenuAppletInclude.h"
+#include "RadarApplet.h"
 #include "StatusApplet.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
 
@@ -142,7 +144,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     void onNavUp() override
     {
         if (card) {
-            moveAction();
+            moveAction(-1);
             return;
         }
         if (cursor > 0) {
@@ -154,7 +156,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     void onNavDown() override
     {
         if (card) {
-            moveAction();
+            moveAction(1);
             return;
         }
         if (cursor + 1 < nodes.size()) {
@@ -230,9 +232,9 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
 
     // ---------- Node card ----------
     bool card = false;   // showing the selected node's card instead of the list
-    uint8_t action = 0;  // 0 = DM, 1 = traceroute
+    uint8_t action = 0;  // 0 = DM, 1 = traceroute, 2 = radar
     std::string notice;  // one-line feedback on the card ("espera 20s")
-    static constexpr uint8_t ACTIONS = 2;
+    static constexpr uint8_t ACTIONS = 3;
 
     // Card -> list -> out of the list
     void back()
@@ -245,23 +247,47 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         }
     }
 
-    void moveAction()
+    void moveAction(int dir)
     {
-        action = (action + 1) % ACTIONS; // two items: up and down both toggle
+        action = (uint8_t)((action + ACTIONS + dir) % ACTIONS); // wraps around
         notice.clear();
         requestUpdate(EInk::UpdateTypes::FAST); // full render: clear the tile first (false = draw over the old frame)
     }
 
-    StatusApplet *statusApplet(uint8_t *index)
+    // Our own applets, found by the name they are registered under (no RTTI)
+    template <class T> T *findApplet(const char *name, uint8_t *index)
     {
         for (size_t i = 0; i < inkhud->userApplets.size(); i++) {
             Applet *a = inkhud->userApplets[i];
-            if (a && a->name && strcmp(a->name, AppletNames::STATUS) == 0) {
+            if (a && a->name && strcmp(a->name, name) == 0) {
                 *index = (uint8_t)i;
-                return static_cast<StatusApplet *>(a); // our own applet, registered under this name
+                return static_cast<T *>(a);
             }
         }
         return nullptr;
+    }
+
+    void showRadar(NodeNum num)
+    {
+        float meters, bearing;
+        uint8_t index = 0;
+        RadarApplet *radar = findApplet<RadarApplet>(AppletNames::RADAR, &index);
+        if (!RadarApplet::haveOwnPosition())
+            notice = "Sin GPS propio";
+        else if (!RadarApplet::locate(num, &meters, &bearing))
+            notice = "Sin posición conocida";
+        else if (!radar)
+            notice = "Sin applet Radar";
+        else if (!radar->isActive())
+            notice = "Activá Radar en el menú";
+        else {
+            radar->setTarget(num);
+            card = false;
+            setGrabbed(false);
+            inkhud->showApplet(index);
+            return;
+        }
+        requestUpdate(EInk::UpdateTypes::FAST);
     }
 
     void runAction()
@@ -273,8 +299,12 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             compose();
             return;
         }
+        if (action == 2) {
+            showRadar(nodes[cursor]);
+            return;
+        }
         uint8_t index = 0;
-        StatusApplet *st = statusApplet(&index);
+        StatusApplet *st = findApplet<StatusApplet>(AppletNames::STATUS, &index);
         if (!st) {
             notice = "Sin applet Estado";
         } else if (const uint32_t wait = st->traceWaitSeconds()) {
@@ -323,9 +353,15 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         if (node && nodeInfoLiteHasUser(node) && node->short_name[0])
             id = parseShortName((meshtastic_NodeInfoLite *)node) + "   " + id; // what Heard showed big
         printAt(2, y, id);
+        y += lineH;
+        float meters, bearing;
+        if (RadarApplet::locate(num, &meters, &bearing))
+            printAt(2, y, "A " + localizeDistance((uint32_t)meters) + " al " + RadarApplet::cardinal(bearing));
+        else
+            printAt(2, y, parse(RadarApplet::haveOwnPosition() ? "Sin posición conocida" : "Distancia: sin GPS propio"));
         y += lineH + 4;
 
-        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal"};
+        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal", "Radar"};
         const uint16_t rowH = lineH + 2;
         for (uint8_t i = 0; i < ACTIONS; i++) {
             if (i == action)
