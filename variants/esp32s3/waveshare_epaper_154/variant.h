@@ -61,6 +61,11 @@
 #define BATTERY_PIN 4
 #define ADC_CHANNEL ADC_CHANNEL_3
 #define ADC_MULTIPLIER 2.0
+// No VBUS sense pin (the ETA6098 STAT only drives the LED). Without this, "USB / charging" is
+// guessed as battery > 4.20 V, which a full, calibrated cell (target 4.19 V) crosses on noise:
+// "charging" forever, on battery too. Ask the native USB port instead (sees a USB host: a PC or
+// phone; a dumb wall charger reads as unplugged).
+#define USB_HOST_PWR_DETECT
 
 // Battery power latch (CLAUDE.md section 4). HIGH keeps VBAT connected to VSYS after PWR is
 // released; LOW is a real power-off. Driven + hold-latched in variant.cpp.
