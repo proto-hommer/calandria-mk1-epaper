@@ -13,7 +13,7 @@ Mesh Paper 1.54
 
 Versión **v2.8.3-ws154.1** | Basado en el [firmware de Meshtastic](https://github.com/meshtastic/firmware) | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
-[![Descargar firmware](https://img.shields.io/github/v/release/valentinvallespinos-coder/firmware?label=descargar%20firmware&color=2ea44f)](https://github.com/valentinvallespinos-coder/firmware/releases/latest)
+[![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/mesh-paper-154?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/mesh-paper-154/releases/latest)
 
 **Cableás diez hilos, flasheás un `.bin` y tenés un nodo Meshtastic con pantalla e-paper que se lee a pleno sol.**
 
@@ -227,7 +227,7 @@ Sin encoder, **todo se puede hacer con BOOT** y el menú.
 Flashear
 --------
 
-1. Bajá el `…factory.bin` del [último release](https://github.com/valentinvallespinos-coder/firmware/releases/latest).
+1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/mesh-paper-154/releases/latest).
 2. **Mantené BOOT apretado mientras enchufás el USB** (modo descarga).
 3. Flasheá en la dirección `0x0`:
 
@@ -297,4 +297,4 @@ Créditos
 Licencia GPL-3.0, la misma que Meshtastic. Proyecto comunitario no oficial, sin soporte de
 Meshtastic ni de Waveshare.
 
-GitHub: [github.com/valentinvallespinos-coder/firmware](https://github.com/valentinvallespinos-coder/firmware)
+GitHub: [github.com/proto-hommer/mesh-paper-154](https://github.com/proto-hommer/mesh-paper-154)
