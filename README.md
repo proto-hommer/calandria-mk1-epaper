@@ -6,8 +6,8 @@
 |_|  |_|_____|____/|_| |_| |_| /_/   \_\_|   |_____|_| \_\  |_(_)____/   |_|
 ```
 
-Meshtastic en e-paper de 1,54"
-==============================
+Mesh Paper 1.54
+===============
 
 **Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa de Seeed cableado a mano.**
 
@@ -57,7 +57,7 @@ Hardware
 | Pieza | Para qué |
 |---|---|
 | Batería LiPo | Uso portátil. La placa tiene conector y cargador |
-| **Encoder rotativo EC11** con pulsador | Navegación rápida y teclado en pantalla. Sin él, todo se usa con el botón BOOT |
+| **Encoder rotativo EC11** con pulsador | Navegación rápida y teclado en pantalla. Hay que desoldar el codec ES8311. Sin encoder, todo se usa con el botón BOOT |
 | Teclado **CardKB** (I2C) | Escribir mensajes más rápido |
 | **GPS NEO-6M** (GY-NEO6MV2) | Próximamente, ver [Lo que viene](#lo-que-viene) |
 
@@ -94,9 +94,9 @@ quedó andando. El módulo va pegado sobre el dorso de la placa, así que todo e
 **3. Pantalla.** El e-paper tiene su propio bus SPI y una línea de alimentación (GPIO6) que hay que
 activar. Se usa el driver `GDEY0154D67` (familia SSD1681) con InkHUD.
 
-**4. El codec de audio, afuera.** El ES8311 no se usa, así que se levantó y sus líneas I2S (MCLK,
-SCLK, LRCK) quedaron para el encoder. Se eligieron las tres que son *entradas* del codec, para que
-nunca peleen con lo que se conecte.
+**4. El codec de audio, afuera.** El ES8311 no se usa, así que **se desoldó** y tres de sus líneas
+I2S (MCLK, SCLK, LRCK) quedaron libres para el encoder. Se soldó directo a los pads que dejó el chip.
+El firmware nunca inicializa el audio.
 
 **5. Encoder → InkHUD.** InkHUD no usa el sistema de entrada estándar de Meshtastic, así que el
 encoder tiene su propia capa: una *fuente* que decodifica la cuadratura por interrupción y un
@@ -149,11 +149,13 @@ Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cor
 **Consola:** va por el USB nativo. No conectes adaptadores UART a GPIO43/44.
 **RF_SW:** GPIO3 comparte línea con el LED verde (vía 24K). Es normal que el LED reaccione.
 
-### Encoder EC11 → pads del ES8311
+### Encoder EC11 → pads del ES8311 (chip desoldado)
+
+Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 
 ```
   ┌──────────────┐                 ┌──────────────────────────┐
-  │    EC11      │                 │   ES8311 (pads del QFN)  │
+  │    EC11      │                 │ pads del ES8311 (QFN)    │
   │              │                 │                          │
   │ A        ────┼─────────────────┼──── GPIO 15  (pata 6)    │
   │ B        ────┼─────────────────┼──── GPIO 38  (pata 8)    │
@@ -260,7 +262,6 @@ Lo que viene
 
 - **GPS NEO-6M** en el conector del touch (libre en esta versión): TX del GPS a GPIO21, RX a GPIO7.
   Posición propia sin depender del celular.
-- Probar el encoder soldado (hasta ahora se validó con un simulador por consola serie).
 - Validar a batería el apagado completo y el deep sleep.
 - Calibrar la lectura de batería.
 

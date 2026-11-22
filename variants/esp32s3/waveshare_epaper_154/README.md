@@ -21,7 +21,8 @@ on-screen keyboard, a waypoint compass, a radar of nearby nodes and a status scr
 | EC11 rotary encoder with push button (optional) | 20 detents per turn |
 
 The microSD slot is **not used**: its pads carry the radio signals. Leave it empty. The ES8311
-audio codec is not used either: three of its lines carry the encoder.
+audio codec is not used either. For the encoder, desolder the codec and wire the encoder to three
+of the pads it leaves free.
 
 Board schematic: [Waveshare wiki](https://www.waveshare.com/wiki/ESP32-S3-ePaper-1.54).
 
@@ -45,7 +46,7 @@ Check the Wio-SX1262 pinout from Seeed to find each signal on the module.
 
 ### Rotary encoder (optional)
 
-| Encoder pin | GPIO | ES8311 pin (QFN) |
+| Encoder pin | GPIO | ES8311 pad (codec removed) |
 |---|---|---|
 | A | 15 | 6 (I2S_SCLK) |
 | B | 38 | 8 (I2S_LRCK) |
@@ -126,11 +127,10 @@ the menu. On USB power the board runs regardless.
 
 ## Status
 
-Working and in daily use: radio, e-paper, InkHUD, the BOOT button and the new applets.
+Working and in daily use: radio, e-paper, InkHUD, the BOOT button, the rotary encoder and the new applets.
 
 Not yet fully verified:
 
-- The encoder UI has been tested with a serial-console simulator, but not yet with a soldered encoder.
 - Battery power-on/off and deep sleep with the latch.
 - Battery voltage reading is not calibrated.
 - GPS (NEO-6M on the touch connector, GPIO21/7) is planned but not yet supported.

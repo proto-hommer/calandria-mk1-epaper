@@ -21,7 +21,8 @@ respuestas, teclado en pantalla, brújula de waypoints, radar de nodos cercanos 
 | Encoder rotativo EC11 con pulsador (opcional) | 20 pasos por vuelta |
 
 La ranura microSD **no se usa**: sus pads llevan las señales de la radio. Dejala vacía. El codec de
-audio ES8311 tampoco se usa: tres de sus líneas llevan el encoder.
+audio ES8311 tampoco se usa. Para el encoder, desoldá el codec y cableá el encoder a tres de los
+pads que deja libres.
 
 Esquemático de la placa: [wiki de Waveshare](https://www.waveshare.com/wiki/ESP32-S3-ePaper-1.54).
 
@@ -45,7 +46,7 @@ Para ubicar cada señal en el módulo, mirá el pinout del Wio-SX1262 que public
 
 ### Encoder rotativo (opcional)
 
-| Pata del encoder | GPIO | Pata del ES8311 (QFN) |
+| Pata del encoder | GPIO | Pad del ES8311 (codec retirado) |
 |---|---|---|
 | A | 15 | 6 (I2S_SCLK) |
 | B | 38 | 8 (I2S_LRCK) |
@@ -126,11 +127,10 @@ segundos o usá *Save & Shut Down* en el menú. Con el USB enchufado anda siempr
 
 ## Estado
 
-Funcionando y en uso diario: radio, e-paper, InkHUD, botón BOOT y los applets nuevos.
+Funcionando y en uso diario: radio, e-paper, InkHUD, botón BOOT, encoder y los applets nuevos.
 
 Sin verificar del todo:
 
-- La interfaz del encoder se probó con un simulador por consola serie, todavía no con un encoder soldado.
 - Prender y apagar a batería, y el deep sleep con el latch.
 - La lectura de batería no está calibrada.
 - El GPS (NEO-6M en el conector del touch, GPIO21/7) está planeado pero todavía no tiene soporte.
