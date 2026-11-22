@@ -62,7 +62,7 @@ Internal pull-ups are used, so no resistors are needed. If turning goes the wron
 ## Flashing a prebuilt release
 
 Download `firmware-waveshare-epaper-154-inkhud-*.factory.bin` from the
-[Releases](../../../../releases) page.
+[Releases](https://github.com/valentinvallespinos-coder/firmware/releases) page.
 
 1. Put the board in download mode: **hold BOOT while you plug in the USB cable**.
 2. Flash with [esptool](https://docs.espressif.com/projects/esptool/) (`pip install esptool`):

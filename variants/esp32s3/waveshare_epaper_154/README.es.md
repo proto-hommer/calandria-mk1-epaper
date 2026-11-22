@@ -62,7 +62,7 @@ intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` en `variant.h`.
 ## Flashear un release ya compilado
 
 Bajá `firmware-waveshare-epaper-154-inkhud-*.factory.bin` de la página de
-[Releases](../../../../releases).
+[Releases](https://github.com/valentinvallespinos-coder/firmware/releases).
 
 1. Poné la placa en modo descarga: **mantené BOOT apretado mientras enchufás el USB**.
 2. Flasheá con [esptool](https://docs.espressif.com/projects/esptool/) (`pip install esptool`):
