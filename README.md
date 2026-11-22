@@ -153,6 +153,13 @@ Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cor
 
 Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 
+<p align="center">
+  <img src="variants/esp32s3/waveshare_epaper_154/img/encoder-esquema.svg" alt="Diagrama: encoder EC11 a los pads 2, 6 y 8 del ES8311, común y pulsador a GND" width="48%"/>
+  &nbsp;
+  <img src="variants/esp32s3/waveshare_epaper_154/img/encoder-placa.jpg" alt="Encoder EC11 cableado con alambre esmaltado a los pads del codec" width="48%"/>
+</p>
+<p align="center"><i>Izquierda: el cableado del encoder a los pads del codec. Derecha: así queda en la placa, con la radio arriba y la batería conectada.</i></p>
+
 ```
   ┌──────────────┐                 ┌──────────────────────────┐
   │    EC11      │                 │ pads del ES8311 (QFN)    │
