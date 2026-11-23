@@ -1,19 +1,19 @@
-```
- __  __ _____ ____  _   _   ____   _    ____  _____ ____     _   ____  _  _
-|  \/  | ____/ ___|| | | | |  _ \ / \  |  _ \| ____|  _ \   / | | ___|| || |
-| |\/| |  _| \___ \| |_| | | |_) / _ \ | |_) |  _| | |_) |  | | |___ \| || |_
-| |  | | |___ ___) |  _  | |  __/ ___ \|  __/| |___|  _ <   | |_ ___) |__   _|
-|_|  |_|_____|____/|_| |_| |_| /_/   \_\_|   |_____|_| \_\  |_(_)____/   |_|
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-oscuro.svg">
+    <source media="(prefers-color-scheme: light)" srcset="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-claro.svg">
+    <img alt="CalandriApp" src="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-claro.svg" width="200">
+  </picture>
+</p>
 
-Mesh Paper 1.54
-===============
+Calandria MK1 epaper
+====================
 
 **Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa de Seeed cableado a mano.**
 
 Versión **v2.8.3-ws154.1** | Basado en el [firmware de Meshtastic](https://github.com/meshtastic/firmware) | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
-[![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/mesh-paper-154?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/mesh-paper-154/releases/latest)
+[![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
 
 **Cableás diez hilos, flasheás un `.bin` y tenés un nodo Meshtastic con pantalla e-paper que se lee a pleno sol.**
 
@@ -227,13 +227,13 @@ Sin encoder, **todo se puede hacer con BOOT** y el menú.
 Flashear
 --------
 
-1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/mesh-paper-154/releases/latest).
+1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest).
 2. **Mantené BOOT apretado mientras enchufás el USB** (modo descarga).
 3. Flasheá en la dirección `0x0`:
 
 ```sh
 pip install esptool
-esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-waveshare-epaper-154-inkhud-*.factory.bin
+esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-calandria-mk1-epaper-*.factory.bin
 ```
 
 ¿Sin Python? Usá [ESP Tool](https://espressif.github.io/esptool-js/) en Chrome o Edge, con la dirección `0x0`.
@@ -256,8 +256,8 @@ Compilar desde el código
 
 ```sh
 # Instalá PlatformIO, cloná este repo y:
-pio run -e waveshare-epaper-154-inkhud      # build normal, con pantalla
-pio run -e waveshare-epaper-154-headless    # solo radio, para aislar problemas
+pio run -e calandria-mk1-epaper             # build normal, con pantalla
+pio run -e calandria-mk1-epaper-headless    # solo radio, para aislar problemas
 ```
 
 El código de la variante está en [`variants/esp32s3/waveshare_epaper_154/`](variants/esp32s3/waveshare_epaper_154/).
@@ -297,4 +297,4 @@ Créditos
 Licencia GPL-3.0, la misma que Meshtastic. Proyecto comunitario no oficial, sin soporte de
 Meshtastic ni de Waveshare.
 
-GitHub: [github.com/proto-hommer/mesh-paper-154](https://github.com/proto-hommer/mesh-paper-154)
+GitHub: [github.com/proto-hommer/calandria-mk1-epaper](https://github.com/proto-hommer/calandria-mk1-epaper)

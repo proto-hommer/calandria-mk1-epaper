@@ -5,7 +5,8 @@
     <img alt="CalandriApp" src="img/calandriapp-logo-claro.svg" width="200">
   </picture>
 </p>
-# Meshtastic on Waveshare ESP32-S3-ePaper-1.54 + Wio-SX1262
+
+# Calandria MK1 epaper: Meshtastic on Waveshare ESP32-S3-ePaper-1.54 + Wio-SX1262
 
 *[Leer en español](README.es.md)*
 
@@ -69,14 +70,14 @@ Internal pull-ups are used, so no resistors are needed. If turning goes the wron
 
 ## Flashing a prebuilt release
 
-Download `firmware-waveshare-epaper-154-inkhud-*.factory.bin` from the
-[Releases](https://github.com/proto-hommer/mesh-paper-154/releases) page.
+Download `firmware-calandria-mk1-epaper-*.factory.bin` from the
+[Releases](https://github.com/proto-hommer/calandria-mk1-epaper/releases) page.
 
 1. Put the board in download mode: **hold BOOT while you plug in the USB cable**.
 2. Flash with [esptool](https://docs.espressif.com/projects/esptool/) (`pip install esptool`):
 
    ```sh
-   esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-waveshare-epaper-154-inkhud-X.Y.Z.factory.bin
+   esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-calandria-mk1-epaper-X.Y.Z.factory.bin
    ```
 
    Replace `COM5` with your port (`/dev/ttyACM0` on Linux). Or use the browser-based
@@ -91,13 +92,13 @@ To update later without erasing settings, flash the non-factory `.bin` at `0x100
 Requires [PlatformIO](https://platformio.org/). From the repository root:
 
 ```sh
-pio run -e waveshare-epaper-154-inkhud
+pio run -e calandria-mk1-epaper
 ```
 
 | Environment | What it is |
 |---|---|
-| `waveshare-epaper-154-inkhud` | Normal build, with InkHUD on the e-paper |
-| `waveshare-epaper-154-headless` | Radio only, no display. Useful to isolate problems |
+| `calandria-mk1-epaper` | Normal build, with InkHUD on the e-paper |
+| `calandria-mk1-epaper-headless` | Radio only, no display. Useful to isolate problems |
 
 Output goes to `.pio/build/<env>/`. The serial console is on native USB CDC.
 
