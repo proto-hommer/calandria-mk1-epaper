@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="img/calandriapp-logo-oscuro.svg">
+    <source media="(prefers-color-scheme: light)" srcset="img/calandriapp-logo-claro.svg">
+    <img alt="CalandriApp" src="img/calandriapp-logo-claro.svg" width="200">
+  </picture>
+</p>
 # Meshtastic on Waveshare ESP32-S3-ePaper-1.54 + Wio-SX1262
 
 *[Leer en español](README.es.md)*
