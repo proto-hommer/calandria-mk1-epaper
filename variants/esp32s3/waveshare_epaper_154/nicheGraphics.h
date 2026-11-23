@@ -29,6 +29,26 @@
 #include "WaypointCompassApplet.h"
 
 #include "NodeDB.h"
+#include "mesh/Channels.h"
+
+#include <cstdio>
+
+// Menu name of a channel applet: "Canal 1: Amigos (privado)". "público" = the well-known default key,
+// "privado" = your own key. Read once at boot (fonts must already be set: the menu prints names
+// without decoding UTF-8, so we encode them for the font here).
+static const char *channelAppletName(uint8_t index)
+{
+    using namespace NicheGraphics;
+    static std::string names[2];
+    const meshtastic_Channel &ch = channels.getByIndex(index);
+    const char *kind = ch.role == meshtastic_Channel_Role_DISABLED ? "sin usar"
+                       : channels.isDefaultChannel(index)          ? "público"
+                                                                   : "privado";
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s%u: %s (%s)", AppletNames::CHANNEL_PREFIX, index, channels.getName(index), kind);
+    names[index] = InkHUD::Applet::fontSmall.decodeUTF8(buf);
+    return names[index].c_str();
+}
 
 // One-time changes to SAVED applet settings, versioned in our own flash file so that afterwards the
 // user's menu choices are respected. Applets are looked up by name, never by hardcoded index.
@@ -137,8 +157,8 @@ void setupNicheGraphics()
     // another one's saved flags. New applets go at the END.
     inkhud->addApplet(AppletNames::ALL_MESSAGES, new InkHUD::AllMessageApplet, true, true);
     inkhud->addApplet(AppletNames::DMS, new InkHUD::DMApplet);
-    inkhud->addApplet(AppletNames::CHANNEL_0, new InkHUD::ThreadedMessageApplet(0));
-    inkhud->addApplet(AppletNames::CHANNEL_1, new InkHUD::ThreadedMessageApplet(1));
+    inkhud->addApplet(channelAppletName(0), new InkHUD::ThreadedMessageApplet(0));
+    inkhud->addApplet(channelAppletName(1), new InkHUD::ThreadedMessageApplet(1));
     inkhud->addApplet(AppletNames::RADAR, new InkHUD::RadarApplet, true);
     inkhud->addApplet(AppletNames::WAYPOINTS, new InkHUD::WaypointCompassApplet); // same slot: stock list + compass
     inkhud->addApplet(AppletNames::FAVORITES_MAP, new InkHUD::FavoritesMapApplet);
