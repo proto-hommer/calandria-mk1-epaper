@@ -25,12 +25,13 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-FONT_HEADER = REPO_ROOT / "src/graphics/niche/Fonts/FreeSans12pt_Win1252.h"
+FONT_DIR = REPO_ROOT / "src/graphics/niche/Fonts"
 
 # Target bitmap (width must be a multiple of 8)
 LOGO_W, LOGO_H = 120, 100
 SCREEN = 200
 TEXT = "CalandriApp"
+POWERED_BY = "powered by MESHTASTIC\u00ae"  # must match LogoApplet.cpp
 
 # 1-bit adaptation, in output pixels
 SS = 8  # supersampling factor
@@ -149,9 +150,10 @@ def load_gfx_font(path):
 class GfxText:
     """Mimics InkHUD::AppletFont metrics and Applet::printAt(CENTER, TOP)."""
 
-    def __init__(self, path, pad_top=-3, pad_bottom=1):  # FREESANS_12PT padding
+    def __init__(self, path, pad_top, pad_bottom):  # padding as in AppletFont.h
         self.bitmap, self.glyphs, self.first, self.last = load_gfx_font(path)
         self.ascender = max(max(0, -g[5]) for g in self.glyphs) + pad_top
+        self.descender = max(max(0, g[2] + g[5]) for g in self.glyphs) + pad_bottom
 
     def glyph(self, ch):
         return self.glyphs[ord(ch) - self.first]
@@ -185,10 +187,11 @@ class GfxText:
             cx += adv
 
 
-def render_screen(logo, font):
+def render_screen(logo, font, small):
     """Boot screen as LogoApplet::onRender draws it with USERPREFS_OEM_* set."""
     screen = Image.new("1", (SCREEN, SCREEN), 1)  # 1 = white here
     cx, cy = int(SCREEN * 0.5), int(SCREEN * (0.5 - 0.05))
+    cy -= int(SCREEN * 0.06)  # LogoApplet moves the block up when USERPREFS_OEM_POWERED_BY is set
     left, top = cx - LOGO_W // 2, cy - LOGO_H // 2
     lp = logo.load()
     sp = screen.load()
@@ -198,7 +201,12 @@ def render_screen(logo, font):
                 sp[left + x, top + y] = 0
     if font.width(TEXT) > 0.8 * SCREEN:
         print(f"warning: '{TEXT}' is wider than 80% of the screen; InkHUD will fall back to a smaller font")
-    font.draw_centered_top(screen, cx, cy + LOGO_H // 2 + int(SCREEN * 0.1), TEXT)
+    text_top = cy + LOGO_H // 2 + int(SCREEN * 0.1)
+    font.draw_centered_top(screen, cx, text_top, TEXT)
+    small_top = text_top + font.ascender + font.descender + 2
+    small.draw_centered_top(screen, cx, small_top, POWERED_BY)
+    if small_top + small.ascender + small.descender > SCREEN:
+        print("warning: the 'powered by' line does not fit on screen")
     return screen
 
 
@@ -208,6 +216,7 @@ def update_userprefs(path, data):
         "USERPREFS_OEM_IMAGE_WIDTH": str(LOGO_W),
         "USERPREFS_OEM_IMAGE_HEIGHT": str(LOGO_H),
         "USERPREFS_OEM_IMAGE_DATA": data,
+        "USERPREFS_OEM_POWERED_BY": "true",
     }
     lines = Path(path).read_text(encoding="utf-8").splitlines(keepends=True)
     done = set()
@@ -236,7 +245,9 @@ def main():
 
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    screen = render_screen(logo, GfxText(FONT_HEADER))
+    large = GfxText(FONT_DIR / "FreeSans12pt_Win1252.h", -3, 1)  # fontLarge = FREESANS_12PT
+    small = GfxText(FONT_DIR / "FreeSans6pt_Win1252.h", -1, -2)  # fontSmall = FREESANS_6PT
+    screen = render_screen(logo, large, small)
     screen.save(out / "calandriapp-arranque-200.png")
     screen.resize((SCREEN * 4, SCREEN * 4), Image.Resampling.NEAREST).save(out / "calandriapp-arranque-200-zoom.png")
     print(f"previews in {out.resolve()}")

@@ -59,6 +59,10 @@ void InkHUD::LogoApplet::onRender(bool full)
     // The effect is similar to the two-stage userPrefs boot screen used by BaseUI
     if (millis() < 10 * 1000UL) {
 
+#ifdef USERPREFS_OEM_POWERED_BY
+        logoCY -= Y(0.06); // Make room for the attribution line
+#endif
+
         // Draw the custom logo
         const uint8_t logo[] = USERPREFS_OEM_IMAGE_DATA;
         drawXBitmap(logoCX - (USERPREFS_OEM_IMAGE_WIDTH / 2),  //  Left
@@ -79,6 +83,13 @@ void InkHUD::LogoApplet::onRender(bool full)
         // Draw custom text below logo
         int16_t logoB = logoCY + (USERPREFS_OEM_IMAGE_HEIGHT / 2); // Bottom of the logo
         printAt(X(0.5), logoB + Y(0.1), USERPREFS_OEM_TEXT, CENTER, TOP);
+
+#ifdef USERPREFS_OEM_POWERED_BY
+        // Attribution line under the custom text (opt-in, userPrefs.jsonc)
+        int16_t textB = logoB + Y(0.1) + getFont().heightAboveCursor() + getFont().heightBelowCursor();
+        setFont(fontSmall);
+        printAt(X(0.5), textB + 2, parse("powered by MESHTASTIC®"), CENTER, TOP);
+#endif
 
         // Don't draw the normal boot screen, we've already drawn our custom version
         return;
