@@ -57,7 +57,11 @@ void InkHUD::LogoApplet::onRender(bool full)
     // Only show the custom screen at startup
     // This allows us to draw the usual Meshtastic logo at shutdown
     // The effect is similar to the two-stage userPrefs boot screen used by BaseUI
-    if (millis() < 10 * 1000UL) {
+    bool customScreen = millis() < 10 * 1000UL;
+#ifdef USERPREFS_OEM_ALWAYS
+    customScreen = customScreen || textTitle.empty(); // Powered-off screen, see onShutdown()
+#endif
+    if (customScreen) {
 
 #ifdef USERPREFS_OEM_POWERED_BY
         logoCY -= Y(0.06); // Make room for the attribution line
@@ -97,7 +101,15 @@ void InkHUD::LogoApplet::onRender(bool full)
 
 #endif
 
+#if defined(USERPREFS_OEM_IMAGE_DATA) && defined(USERPREFS_OEM_ALWAYS)
+    // Custom logo on the status screens too ("Shutting Down...", "Rebooting...")
+    static const uint8_t customLogo[] = USERPREFS_OEM_IMAGE_DATA;
+    drawXBitmap(logoCX - (USERPREFS_OEM_IMAGE_WIDTH / 2), logoCY - (USERPREFS_OEM_IMAGE_HEIGHT / 2), customLogo,
+                USERPREFS_OEM_IMAGE_WIDTH, USERPREFS_OEM_IMAGE_HEIGHT, inverted ? WHITE : BLACK);
+    logoH = USERPREFS_OEM_IMAGE_HEIGHT;
+#else
     drawLogo(logoCX, logoCY, logoW, logoH, inverted ? WHITE : BLACK);
+#endif
 
     if (!textLeft.empty()) {
         setFont(fontSmall);
@@ -162,6 +174,9 @@ void InkHUD::LogoApplet::onShutdown()
     textRight = "";
     textTitle = parseShortName(ourNode);
     fontTitle = fontMedium;
+#if defined(USERPREFS_OEM_IMAGE_DATA) && defined(USERPREFS_OEM_ALWAYS)
+    textTitle = ""; // Empty title selects the full custom screen in onRender()
+#endif
 
     // This is then drawn by InkHUD::Events::onShutdown, with a blocking FULL update, after InkHUD's flash write is complete
 }
