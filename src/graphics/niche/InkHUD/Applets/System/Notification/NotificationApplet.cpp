@@ -13,6 +13,7 @@
 
 #include "meshUtils.h"
 #include "modules/TextMessageModule.h"
+#include <cstring>
 
 #include "gps/RTC.h"
 
@@ -74,6 +75,16 @@ int InkHUD::NotificationApplet::onReceiveTextMessage(const meshtastic_MeshPacket
 
     // Return zero: no issues here, carry on notifying other observers!
     return 0;
+}
+
+void InkHUD::NotificationApplet::showText(const char *text)
+{
+    Notification n;
+    n.type = Notification::Type::NOTIFICATION_TEXT;
+    n.timestamp = getValidTime(RTCQuality::RTCQualityDevice, true);
+    strncpy(n.text, text, sizeof(n.text) - 1);
+    n.text[sizeof(n.text) - 1] = '\0';
+    showNotification(n);
 }
 
 #if !MESHTASTIC_EXCLUDE_WAYPOINT
@@ -326,6 +337,10 @@ std::string InkHUD::NotificationApplet::getNotificationText(uint16_t widthAvaila
         text += currentNotification.geofenceNodeName;
         text += currentNotification.geofenceEntered ? " IN " : " OUT ";
         text += currentNotification.geofenceName;
+    }
+
+    else if (currentNotification.type == Notification::Type::NOTIFICATION_TEXT) {
+        text += currentNotification.text;
     }
 
     // Parse any non-ascii characters and return

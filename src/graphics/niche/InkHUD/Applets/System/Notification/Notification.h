@@ -23,7 +23,8 @@ class Notification
         NOTIFICATION_MESSAGE_BROADCAST,
         NOTIFICATION_MESSAGE_DIRECT,
         NOTIFICATION_BATTERY,
-        NOTIFICATION_GEOFENCE
+        NOTIFICATION_GEOFENCE,
+        NOTIFICATION_TEXT // Free text supplied by the caller (NotificationApplet::showText)
     } type;
 
     uint32_t timestamp;
@@ -42,6 +43,7 @@ class Notification
     char geofenceName[sizeof(meshtastic_Waypoint::name)];
     uint32_t geofenceWaypointId;
     bool geofenceEntered;
+    char text[48];
 };
 
 } // namespace NicheGraphics::InkHUD

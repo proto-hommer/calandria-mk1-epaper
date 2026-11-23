@@ -45,6 +45,8 @@ class NotificationApplet : public SystemApplet
     int onGeofenceEvent(const GeofenceNotificationEvent *event);
 #endif
 
+    void showText(const char *text); // Pop up a caller-supplied line (UTF-8)
+
     bool isApproved(); // Does a foreground applet make notification redundant?
     void dismiss();    // Close the Notification Popup
 

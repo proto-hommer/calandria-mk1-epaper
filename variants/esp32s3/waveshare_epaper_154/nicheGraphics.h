@@ -21,6 +21,7 @@
 #include "graphics/niche/Utils/FlashData.h"
 
 #include "AppletNames.h"
+#include "DeliveryWatcher.h"
 #include "EncoderInput.h"
 #include "NodePickerApplet.h"
 #include "RadarApplet.h"
@@ -167,6 +168,9 @@ void setupNicheGraphics()
     hideRedundantApplets(inkhud);
 
     inkhud->begin();
+
+    // "No entregado" pop-up when one of our messages is NAKed (needs the Notification applet, so after begin)
+    new InkHUD::DeliveryWatcher();
 
     // Input layer: sources emit abstract events, InkHudNavigator maps them to InkHUD.
     // Registering a source is this + its begin(); the navigator never changes.
