@@ -528,6 +528,12 @@ void InkHUD::MenuApplet::execute(MenuItem item)
         cm.selectedMessageItem = &cm.messageItems.at(cursor - prefixItems);
     } break;
 
+    case SEND_CANNEDMESSAGE_PRESET:
+        if (composePreset && cursor >= composeFirstCanned && cursor - composeFirstCanned < cm.messageItems.size())
+            sendText(composeDest, composeChannel, cm.messageItems.at(cursor - composeFirstCanned).rawText.c_str());
+        inkhud->forceUpdate(Drivers::EInk::UpdateTypes::FULL);
+        break;
+
     case SEND_CANNEDMESSAGE:
         cm.selectedRecipientItem = &cm.recipientItems.at(cursor);
         // send selected message
@@ -1364,6 +1370,11 @@ void InkHUD::MenuApplet::showPage(MenuPage page)
     case CANNEDMESSAGE_RECIPIENT:
         populateRecipientPage();
         previousPage = MenuPage::SEND;
+        break;
+
+    case COMPOSE_TO:
+        previousPage = MenuPage::EXIT;
+        populateComposePage();
         break;
 
     case REMOVE_WAYPOINT_LIST:
@@ -2564,10 +2575,17 @@ void InkHUD::MenuApplet::onNavRight()
 void InkHUD::MenuApplet::composeTo(NodeNum dest, ChannelIndex channel)
 {
     // The menu must already be in the foreground (openMenu). Jump straight to free-text entry
-    // for a fixed recipient, mirroring the FREE_TEXT menu action.
+    // for a fixed recipient, mirroring the FREE_TEXT menu action. With canned messages stored, offer
+    // them first (COMPOSE_TO page): free text is then one item of that list.
     composePreset = true;
     composeDest = dest;
     composeChannel = channel;
+    if (cm.store && cm.store->size() > 0) {
+        cursorShown = true;
+        showPage(MenuPage::COMPOSE_TO);
+        requestUpdate(Drivers::EInk::UpdateTypes::FAST);
+        return;
+    }
 
     OSThread::enabled = false;
     handleFreeText = true;
@@ -2630,10 +2648,14 @@ void InkHUD::MenuApplet::onFreeTextCancel()
     // Clear the free text message
     cm.freeTextItem.rawText.erase();
 
-    // composeTo(): nothing to choose after cancelling, so close the menu
+    // composeTo(): back to the canned message list if there is one, otherwise close the menu
     if (composePreset) {
-        composePreset = false;
-        showPage(MenuPage::EXIT);
+        if (cm.store && cm.store->size() > 0) {
+            showPage(MenuPage::COMPOSE_TO);
+        } else {
+            composePreset = false;
+            showPage(MenuPage::EXIT);
+        }
     }
 
     requestUpdate(Drivers::EInk::UpdateTypes::FAST);
@@ -2732,6 +2754,29 @@ void InkHUD::MenuApplet::populateSendPage()
         const char *itemText = cm.messageItems.back().label.c_str();
         items.push_back(MenuItem(itemText, MenuAction::STORE_CANNEDMESSAGE_SELECTION, MenuPage::CANNEDMESSAGE_RECIPIENT));
     }
+
+    items.push_back(MenuItem("Exit", MenuPage::EXIT));
+}
+
+// composeTo() with canned messages: free text first (if a keyboard is usable), then each canned
+// message, sent straight to the preset recipient
+void InkHUD::MenuApplet::populateComposePage()
+{
+    cm.messageItems.clear();
+    if (supportsFreeTextKeyboard(inkhud, settings))
+        items.push_back(MenuItem("Free Text", MenuAction::FREE_TEXT, MenuPage::COMPOSE_TO));
+    composeFirstCanned = items.size();
+
+    uint8_t count = cm.store->size();
+    for (uint8_t i = 0; i < count; i++) {
+        CannedMessages::MessageItem messageItem;
+        messageItem.rawText = cm.store->at(i);
+        messageItem.label = parse(messageItem.rawText);
+        cm.messageItems.push_back(messageItem);
+    }
+    // Labels point into cm.messageItems: add the items only once the vector stops growing
+    for (const auto &m : cm.messageItems)
+        items.push_back(MenuItem(m.label.c_str(), MenuAction::SEND_CANNEDMESSAGE_PRESET, MenuPage::EXIT));
 
     items.push_back(MenuItem("Exit", MenuPage::EXIT));
 }

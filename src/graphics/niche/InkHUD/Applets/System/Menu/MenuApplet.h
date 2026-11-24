@@ -54,6 +54,7 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     void showPage(MenuPage page); // Load and display a MenuPage
 
     void populateSendPage();           // Dynamically create MenuItems including canned messages
+    void populateComposePage();        // composeTo(): canned messages (+ free text) for a fixed recipient
     void populateRecipientPage();      // Dynamically create a page of possible destinations for a canned message
     void populateAppletPage();         // Dynamically create MenuItems for toggling loaded applets
     void populateAutoshowPage();       // Dynamically create MenuItems for selecting which applets can autoshow
@@ -83,6 +84,7 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     bool composePreset = false;
     NodeNum composeDest = 0;
     ChannelIndex composeChannel = 0;
+    size_t composeFirstCanned = 0; // COMPOSE_TO page: index of the first canned message item
     uint16_t systemInfoPanelHeight = 0; // Need to know before we render
     uint16_t menuTextLimit = 200;
 

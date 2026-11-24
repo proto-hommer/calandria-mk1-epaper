@@ -22,6 +22,7 @@ enum MenuAction {
     FREE_TEXT,
     STORE_CANNEDMESSAGE_SELECTION,
     SEND_CANNEDMESSAGE,
+    SEND_CANNEDMESSAGE_PRESET, // composeTo(): send a canned message to the preset recipient
     SHUTDOWN,
     NEXT_TILE,
     TOGGLE_BACKLIGHT,

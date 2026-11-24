@@ -54,6 +54,7 @@ enum MenuPage : uint8_t {
     AUTOSHOW,
     RECENTS, // Select length of "recentlyActiveSeconds"
     REGION,
+    COMPOSE_TO, // composeTo(): canned message or free text, recipient already fixed
     EXIT, // Dismiss the menu applet
 };
 
