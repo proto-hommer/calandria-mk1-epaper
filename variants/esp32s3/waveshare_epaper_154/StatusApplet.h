@@ -19,7 +19,8 @@ InkHUD applet "Estado": everything about this node on one page.
     The reply carries the SNR at which each hop received the previous one (snr_towards); [0] is
     the first node that heard us. User-triggered only, with a cooldown, to keep airtime low.
   - Channel: channel utilisation and our own TX airtime (like BaseUI's LoRa screen).
-  - GPS: connected? fix? satellites in view (module still pending: shows "no conectado").
+  - Own position: where it comes from (phone / saved / fixed) and its age (OwnPosition.h); the GPS
+    line only appears once a GPS module is actually detected.
 
 Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS while on screen.
 
@@ -28,6 +29,7 @@ Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS whil
 #include "graphics/niche/InkHUD/Applet.h"
 
 #include "GPSStatus.h"
+#include "OwnPosition.h"
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "PowerStatus.h"
@@ -365,12 +367,11 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
             l.push_back("Pulsar: medir cómo nos oyen");
         l.push_back("");
 
-        // GPS
+        // Position: no GPS on this board, so say where ours comes from instead of "GPS: no conectado"
         if (gpsStatus && gpsStatus->getIsConnected())
             l.push_back(fmt("GPS %s  %lu sat", gpsStatus->getHasLock() ? "con fix" : "sin fix",
                             (unsigned long)gpsStatus->getNumSatellites()));
-        else
-            l.push_back("GPS: no conectado");
+        l.push_back(OwnPosition::statusLine());
 
         return l;
     }
