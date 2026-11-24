@@ -1,5 +1,6 @@
 #include "configuration.h"
 #include "CalandriaBeacon.h"
+#include "OwnPosition.h"
 #include "concurrency/OSThread.h"
 #include "main.h"
 #include <Arduino.h>
@@ -72,6 +73,9 @@ void lateInitVariant()
     LOG_INFO("Battery latch: GPIO%d held HIGH", BAT_CONTROL_PIN);
 
     new PowerKeyThread();
+
+    // No GPS: our position only lives in RAM until the phone sends one. Bring back the saved one.
+    OwnPosition::restore();
 
     // "I am a Calandria MK1 epaper" on a private port, for CalandriApp (both builds: not a UI feature)
     new CalandriaBeacon();

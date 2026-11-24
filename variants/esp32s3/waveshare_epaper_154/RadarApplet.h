@@ -24,6 +24,7 @@ what is shown changed (target, distance, 10-degree bearing step, dot count).
 #include "graphics/niche/InkHUD/Applet.h"
 
 #include "NodeDB.h"
+#include "OwnPosition.h"
 #include "SinglePortModule.h"
 #include "concurrency/OSThread.h"
 #include "gps/GeoCoord.h"
@@ -75,7 +76,7 @@ class RadarApplet : public Applet, public SinglePortModule, public concurrency::
         return true;
     }
 
-    static bool haveOwnPosition() { return localPosition.latitude_i != 0 || localPosition.longitude_i != 0; }
+    static bool haveOwnPosition() { return OwnPosition::have(); } // restored from NodeDB at boot (OwnPosition.h)
 
     static const char *cardinal(float bearingRad)
     {
