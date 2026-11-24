@@ -14,7 +14,8 @@ Port:    CALANDRIA_PORT (323 = PRIVATE_APP + 67), primary channel, broadcast, no
 Payload: UTF-8 text, fields separated by ';'
          CALANDRIA/1;model=Calandria MK1 epaper;fw=<firmware version>;env=<pio env>
 When:    5 min after boot, then every 6 h, skipped while the channel is busy. A request on this port
-         with want_response is answered directly (at most once a minute, never to relayed broadcasts).
+         with want_response is answered directly: always when it comes from our own phone (to the local
+         node), otherwise at most once a minute and never to relayed broadcasts.
 
 */
 
@@ -57,9 +58,14 @@ class CalandriaBeacon : public SinglePortModule, private concurrency::OSThread
         return PERIOD_MS;
     }
 
-    // Direct answer to an app asking "what are you?" on our port
+    // Direct answer to an app asking "what are you?" on our port.
+    // From our own phone (request to the LOCAL node, from == 0): always answer, it never goes on air.
+    // The app asks on every connection, and a throttled request would get a NO_RESPONSE NAK instead.
+    // From the mesh: never to relayed broadcasts, at most once a minute.
     meshtastic_MeshPacket *allocReply() override
     {
+        if (currentRequest && currentRequest->from == 0)
+            return allocIdentity();
         if (isMultiHopBroadcastRequest())
             return nullptr;
         if (lastReplyMs && Throttle::isWithinTimespanMs(lastReplyMs, REPLY_MIN_INTERVAL_MS))
