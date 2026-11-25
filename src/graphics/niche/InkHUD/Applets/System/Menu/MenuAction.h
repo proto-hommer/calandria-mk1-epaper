@@ -143,6 +143,7 @@ enum MenuAction {
     // Administration
     RESET_NODEDB_ALL,
     RESET_NODEDB_KEEP_FAVORITES,
+    FORGET_GHOST_NODES,
     WIPE_MESSAGES_ALL,
     // Map zoom (MapApplet and FavoritesMapApplet)
     MAP_ZOOM_IN,

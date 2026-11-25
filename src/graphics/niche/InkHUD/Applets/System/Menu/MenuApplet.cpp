@@ -18,6 +18,7 @@
 #include "mqtt/MQTT.h"
 #endif
 #include "graphics/niche/InkHUD/Applets/Bases/Map/MapApplet.h"
+#include "graphics/niche/InkHUD/Applets/System/Notification/NotificationApplet.h"
 #include "graphics/niche/InkHUD/Applets/User/Waypoints/WaypointListApplet.h"
 #if !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_I2C && !MESHTASTIC_EXCLUDE_ACCELEROMETER
 #include "graphics/niche/InkHUD/Applets/User/Steps/StepsApplet.h"
@@ -42,6 +43,39 @@
 #endif
 
 using namespace NicheGraphics;
+
+// "Ghost" nodes, same rule as CalandriApp: an older entry with the same long name as a node heard
+// more recently (the node number changed after a reflash or a board swap), or not heard for over
+// GHOST_STALE_DAYS. Never our own node. Removed without a reboot, unlike Reset NodeDB.
+static constexpr uint32_t GHOST_STALE_DAYS = 7;
+
+static size_t forgetGhostNodes()
+{
+    const NodeNum me = nodeDB->getNodeNum();
+    const uint32_t now = getValidTime(RTCQualityDevice);
+    const size_t count = nodeDB->getNumMeshNodes();
+    std::vector<NodeNum> ghosts;
+    for (size_t i = 0; i < count; i++) {
+        const meshtastic_NodeInfoLite *n = nodeDB->getMeshNodeByIndex(i);
+        if (!n || n->num == me)
+            continue;
+        bool ghost = now && n->last_heard && n->last_heard < now && now - n->last_heard > GHOST_STALE_DAYS * 86400UL;
+        if (!ghost && nodeInfoLiteHasUser(n) && n->long_name[0]) {
+            for (size_t j = 0; j < count && !ghost; j++) {
+                const meshtastic_NodeInfoLite *o = nodeDB->getMeshNodeByIndex(j);
+                ghost = o && o->num != n->num && nodeInfoLiteHasUser(o) && o->last_heard > n->last_heard &&
+                        strcmp(o->long_name, n->long_name) == 0;
+            }
+        }
+        if (ghost)
+            ghosts.push_back(n->num);
+    }
+    // Collected first: removeNodeByNum() compacts meshNodes (and saves it to flash) on each call
+    for (NodeNum num : ghosts)
+        nodeDB->removeNodeByNum(num);
+    LOG_INFO("Forgot %u ghost nodes", (unsigned)ghosts.size());
+    return ghosts.size();
+}
 
 // External Notification settings only make sense with a buzzer pin or I2S audio output
 #if defined(PIN_BUZZER) || defined(HAS_I2S) || defined(HAS_I2S_SPEAKER_NRF52)
@@ -1197,6 +1231,20 @@ void InkHUD::MenuApplet::execute(MenuItem item)
         rebootAtMsec = Time::timerEndsAtMillis(DEFAULT_REBOOT_SECONDS * 1000);
         break;
 
+    case FORGET_GHOST_NODES: {
+        const size_t n = forgetGhostNodes();
+        char text[32];
+        if (n)
+            snprintf(text, sizeof(text), "Fantasmas: %u borrados", (unsigned)n);
+        else
+            snprintf(text, sizeof(text), "Sin fantasmas");
+        NotificationApplet *note = (NotificationApplet *)inkhud->getSystemApplet("Notification");
+        if (note)
+            note->showText(text);
+        inkhud->forceUpdate(Drivers::EInk::UpdateTypes::FULL, true); // gone from Nodes, Radar and maps
+        break;
+    }
+
     case WIPE_MESSAGES_ALL:
         LOG_INFO("Wiping all messages from menu");
         messageStore.clearAllMessages();
@@ -2096,6 +2144,7 @@ void InkHUD::MenuApplet::showPage(MenuPage page)
         items.push_back(MenuItem("Back", previousPage));
         items.push_back(MenuItem("Reset All", MenuAction::RESET_NODEDB_ALL, MenuPage::EXIT));
         items.push_back(MenuItem("Keep Favorites Only", MenuAction::RESET_NODEDB_KEEP_FAVORITES, MenuPage::EXIT));
+        items.push_back(MenuItem("Limpiar fantasmas", MenuAction::FORGET_GHOST_NODES, MenuPage::EXIT));
         items.push_back(MenuItem("Exit", MenuPage::EXIT));
         break;
 
