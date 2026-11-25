@@ -46,7 +46,8 @@ using namespace NicheGraphics;
 
 // "Ghost" nodes, same rule as CalandriApp: an older entry with the same long name as a node heard
 // more recently (the node number changed after a reflash or a board swap), or not heard for over
-// GHOST_STALE_DAYS. Never our own node. Removed without a reboot, unlike Reset NodeDB.
+// GHOST_STALE_DAYS. Never our own node, favorites or ignored nodes (a forgotten ignored node would
+// come back un-ignored). Removed without a reboot, unlike Reset NodeDB.
 static constexpr uint32_t GHOST_STALE_DAYS = 7;
 
 static size_t forgetGhostNodes()
@@ -57,7 +58,7 @@ static size_t forgetGhostNodes()
     std::vector<NodeNum> ghosts;
     for (size_t i = 0; i < count; i++) {
         const meshtastic_NodeInfoLite *n = nodeDB->getMeshNodeByIndex(i);
-        if (!n || n->num == me)
+        if (!n || n->num == me || nodeInfoLiteIsFavorite(n) || nodeInfoLiteIsIgnored(n))
             continue;
         bool ghost = now && n->last_heard && n->last_heard < now && now - n->last_heard > GHOST_STALE_DAYS * 86400UL;
         if (!ghost && nodeInfoLiteHasUser(n) && n->long_name[0]) {
