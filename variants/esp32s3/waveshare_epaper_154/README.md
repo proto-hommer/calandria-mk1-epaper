@@ -122,7 +122,11 @@ The **BOOT** button alone is enough to use the node, so the encoder is optional.
 Applets added by this variant:
 
 - **Nodes:** sorted by last heard, with hop count and age. Each node has a card with *Direct
-  message*, *Measure signal* (traceroute) and *Radar*.
+  message*, *Measure signal* (traceroute), *Radar* and *Forget node* (press twice; no reboot).
+- **Ghost nodes:** after a reflash or a board swap a node can get a new number, and the old one
+  stays in the list under the same name. *Menu → Node Config → Reset NodeDB → Limpiar fantasmas*
+  forgets the older duplicates (same long name, heard earlier) and nodes not heard for over 7
+  days, without a reboot. Same rule as CalandriApp's *Clean up ghosts*.
 - **Waypoints:** pick a waypoint to see its distance and bearing. The compass is **north-up**:
   the board has no magnetometer, so it cannot know which way you are facing.
 - **Radar:** the 10 nearest nodes drawn to scale, with an arrow to the nearest one or to the one

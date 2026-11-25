@@ -123,7 +123,12 @@ Con el botón **BOOT** solo ya se puede usar el nodo, así que el encoder es opc
 Applets que agrega esta variante:
 
 - **Nodes:** ordenada por último escuchado, con saltos y antigüedad. Cada nodo tiene una ficha con
-  *Mensaje directo*, *Medir señal* (traceroute) y *Radar*.
+  *Mensaje directo*, *Medir señal* (traceroute), *Radar* y *Olvidar nodo* (pulsando dos veces, sin
+  reiniciar).
+- **Nodos fantasma:** al reflashear o cambiar la placa, un nodo puede cambiar de número y el viejo
+  queda en la lista con el mismo nombre. *Menú → Node Config → Reset NodeDB → Limpiar fantasmas*
+  olvida los duplicados más viejos (mismo nombre largo, oídos antes) y los que no se oyen hace más
+  de 7 días, sin reiniciar. Es el mismo criterio que *Limpiar fantasmas* de CalandriApp.
 - **Waypoints:** elegís un waypoint y ves la distancia y el rumbo. La brújula va **con el norte
   arriba**: la placa no tiene magnetómetro, así que no puede saber hacia dónde mirás.
 - **Radar:** los 10 nodos más cercanos a escala, con una flecha al más cercano o al que fijaste.
