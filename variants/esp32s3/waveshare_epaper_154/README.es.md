@@ -95,9 +95,24 @@ El nodo muestra su versión en *Estado*. Con CalandriApp conectada (1.8.5 o post
 también muestra "Firmware nuevo: X.Y.Z" cuando hay un release más nuevo (el nodo no tiene
 internet: se lo dice la app), y la hora pasa a la zona horaria del celular enseguida, sin reiniciar.
 
+### Lo nuevo de la 0.6.0
+
+- **Versión propia:** la versión del Calandria se ve en *Estado* y viaja en el beacon de
+  CalandriApp (`ver=`).
+- **Aviso de firmware nuevo:** *Estado* muestra "Firmware nuevo: X.Y.Z" cuando CalandriApp avisa
+  que hay un release más nuevo.
+- **Zona horaria al instante:** la zona horaria del celular se aplica apenas la manda la app, sin
+  reiniciar.
+- **Limpiar fantasmas:** respeta favoritos e ignorados, y escribe la NodeDB en flash una sola vez.
+
 ## Flashear un release ya compilado
 
-Bajá `firmware-calandria-mk1-epaper-*.factory.bin` de la página de
+**Recomendado: el [web flasher](https://proto-hommer.github.io/calandria-flasher/)** (Chrome o Edge
+en una computadora, con el cable USB). Siempre instala el último release. *Actualizar* conserva la
+configuración; *Instalación limpia* borra todo.
+
+Para flashear a mano, bajá
+`firmware-calandria-mk1-epaper-*.factory.bin` de la página de
 [Releases](https://github.com/proto-hommer/calandria-mk1-epaper/releases).
 
 1. Poné la placa en modo descarga: **mantené BOOT apretado mientras enchufás el USB**.

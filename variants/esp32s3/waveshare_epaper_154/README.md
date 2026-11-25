@@ -94,9 +94,24 @@ The node shows its version in *Estado*. With CalandriApp connected (1.8.5 or lat
 shows "Firmware nuevo: X.Y.Z" when a newer release is out (the node has no internet: the app tells
 it), and the clock switches to the phone's timezone right away, with no reboot.
 
+### What's new in 0.6.0
+
+- **Own version:** the Calandria version is shown in *Estado* and sent in the CalandriApp beacon
+  (`ver=`).
+- **New firmware notice:** *Estado* shows "Firmware nuevo: X.Y.Z" when CalandriApp reports a newer
+  release.
+- **Timezone right away:** the phone's timezone applies as soon as the app sends it, no reboot.
+- **Limpiar fantasmas:** keeps favorites and ignored nodes, and writes the NodeDB to flash only
+  once.
+
 ## Flashing a prebuilt release
 
-Download `firmware-calandria-mk1-epaper-*.factory.bin` from the
+**Recommended: the [web flasher](https://proto-hommer.github.io/calandria-flasher/)** (Chrome or
+Edge on a computer, USB cable). It always installs the latest release. *Actualizar* (update) keeps
+your settings; *Instalación limpia* (clean install) erases everything.
+
+To flash by hand instead, download
+`firmware-calandria-mk1-epaper-*.factory.bin` from the
 [Releases](https://github.com/proto-hommer/calandria-mk1-epaper/releases) page.
 
 1. Put the board in download mode: **hold BOOT while you plug in the USB cable**.
