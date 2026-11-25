@@ -12,7 +12,8 @@ packet receives it through the normal FromRadio stream.
 
 Port:    CALANDRIA_PORT (323 = PRIVATE_APP + 67), primary channel, broadcast, no ack.
 Payload: UTF-8 text, fields separated by ';'
-         CALANDRIA/1;model=Calandria MK1 epaper;fw=<firmware version>;env=<pio env>
+         CALANDRIA/1;model=Calandria MK1 epaper;fw=<firmware version>;env=<pio env>;ver=<CALANDRIA_VERSION>
+         (contract with CalandriApp: new fields go at the end, never reorder)
 When:    5 min after boot, then every 6 h, skipped while the channel is busy. A request on this port
          with want_response is answered directly: always when it comes from our own phone (to the local
          node), otherwise at most once a minute and never to relayed broadcasts.
@@ -30,6 +31,9 @@ When:    5 min after boot, then every 6 h, skipped while the channel is busy. A 
 
 constexpr meshtastic_PortNum CALANDRIA_PORT = (meshtastic_PortNum)(meshtastic_PortNum_PRIVATE_APP + 67);
 constexpr const char *CALANDRIA_MODEL = "Calandria MK1 epaper";
+// The Calandria's own semantic version (alpha: 0.x). APP_VERSION stays Meshtastic's (2.8.3.<hash>): apps use it
+// to know which features the firmware has. ws154.1 .. ws154.5 = 0.1.0 .. 0.5.0
+constexpr const char *CALANDRIA_VERSION = "0.6.0";
 
 class CalandriaBeacon : public SinglePortModule, private concurrency::OSThread
 {
@@ -88,7 +92,8 @@ class CalandriaBeacon : public SinglePortModule, private concurrency::OSThread
         if (!p)
             return nullptr;
         int n = snprintf((char *)p->decoded.payload.bytes, sizeof(p->decoded.payload.bytes),
-                         "CALANDRIA/1;model=%s;fw=%s;env=%s", CALANDRIA_MODEL, optstr(APP_VERSION), optstr(APP_ENV));
+                         "CALANDRIA/1;model=%s;fw=%s;env=%s;ver=%s", CALANDRIA_MODEL, optstr(APP_VERSION), optstr(APP_ENV),
+                         CALANDRIA_VERSION);
         p->decoded.payload.size = (n > 0 && (size_t)n < sizeof(p->decoded.payload.bytes)) ? n : 0;
         return p;
     }

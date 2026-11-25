@@ -21,6 +21,7 @@ InkHUD applet "Estado": everything about this node on one page.
   - Channel: channel utilisation and our own TX airtime (like BaseUI's LoRa screen).
   - Own position: where it comes from (phone / saved / fixed) and its age (OwnPosition.h); the GPS
     line only appears once a GPS module is actually detected.
+  - Firmware: "Calandria 0.6.0" (CALANDRIA_VERSION, CalandriaBeacon.h).
 
 Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS while on screen.
 
@@ -28,6 +29,7 @@ Redraws only when the shown text changes; refreshes every STATUS_REFRESH_MS whil
 
 #include "graphics/niche/InkHUD/Applet.h"
 
+#include "CalandriaBeacon.h"
 #include "GPSStatus.h"
 #include "OwnPosition.h"
 #include "MeshService.h"
@@ -372,6 +374,10 @@ class StatusApplet : public Applet, public SinglePortModule, public concurrency:
             l.push_back(fmt("GPS %s  %lu sat", gpsStatus->getHasLock() ? "con fix" : "sin fix",
                             (unsigned long)gpsStatus->getNumSatellites()));
         l.push_back(OwnPosition::statusLine());
+        l.push_back("");
+
+        // Firmware: our own version
+        l.push_back(std::string("Calandria ") + CALANDRIA_VERSION);
 
         return l;
     }
