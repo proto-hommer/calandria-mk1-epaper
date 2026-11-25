@@ -1,27 +1,34 @@
-"""Banner and section titles for the README, in the CalandriApp look ("Topografia" style, Barlow).
+"""Banner y títulos de sección de los README de la familia Calandria, con la identidad 2.0.
 
-Same mark, palette and title style as github.com/proto-hommer/calandriapp, so both repos read as one
-project. Titles are transparent PNGs (readable in GitHub's light and dark themes); the README uses
-the title text as alt text.
+La misma en los tres repos (calandriapp, calandria-mk1-epaper, calandria-flasher), para que se lean
+como un solo proyecto:
 
-Barlow is not in this repo (OFL, from Google Fonts or CalandriApp's res/font):
-    python readme_art.py --barlow path/to/barlow_regular.ttf
-Writes ../img/readme/banner.png and ../img/readme/titulos/*.png
+- Fondo noche (#07090C) con grilla fina de 40 px y curvas de nivel apagadas.
+- La calandria: la malla en gris, los nodos en naranja y el ojo en cian ("vos").
+- El nombre en Barlow, blanco y espaciado; la bajada en monoespaciada gris.
+- Títulos de sección en PNG transparente, en un gris medio que se lee en el tema claro y en el
+  oscuro de GitHub: un punto naranja, el texto y una línea fina que termina en un anillo cian.
+
+Los títulos salen del mismo README: cada <img src=".../titulos/<slug>.png" alt="Texto"> se dibuja con
+su alt ("s-..." = subtítulo). Así, para sumar una sección alcanza con agregarla al README y correr esto.
+
+    python readme_art.py --barlow barlow_regular.ttf --readme ../README.md --banner ../docs/img/banner.png \\
+        --name "CALANDRIA FLASHER" --sub "FIRMWARE · USB · DESDE EL NAVEGADOR" --tag "WEB SERIAL · CHROME O EDGE" \\
+        --footer "para la familia Calandria · powered by Meshtastic®"
+
+Barlow (SIL OFL) no está en el repo: viene de Google Fonts o de res/font de CalandriApp.
 """
 
 import argparse
 import math
 import os
 import re
-import unicodedata
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "img", "readme"))
 MONO = r"C:\Windows\Fonts\consola.ttf"
 
-# CalandriApp mark (marca.svg): nodes, outline and mesh edges; node 13 is the eye
+# La marca (marca.svg): nodos, contorno y malla; el nodo 13 es el ojo
 P = [168, 62, 138, 47, 124, 53, 98, 74, 72, 106, 28, 156, 36, 168, 84, 124, 120, 120, 146, 98, 152, 70, 108, 96, 128, 92, 136, 66]
 PTS = [(P[i], P[i + 1]) for i in range(0, len(P), 2)]
 EYE = 13
@@ -30,49 +37,18 @@ E = [0, 13, 1, 13, 2, 13, 10, 13, 3, 13, 3, 11, 13, 12, 10, 12, 9, 12, 8, 12, 11
 EDGES = [(E[i], E[i + 1]) for i in range(0, len(E), 2)]
 BOX = (24.8, 43.8, 146.4, 127.4)
 
-COPPER = (201, 130, 69)
-COPPER_DIM = (120, 78, 44)
-EYE_C = (60, 200, 120)
-TEAL = (46, 143, 163)
-NAME = (200, 214, 222)
-SUB = (90, 120, 135)
-
-H2 = [
-    "Qué es esto",
-    "Estado del proyecto",
-    "Hardware",
-    "Cómo se hizo",
-    "Cableado",
-    "Funciones",
-    "Flashear",
-    "Compilar desde el código",
-    "Lo que viene",
-    "Problemas conocidos",
-    "Créditos, marcas y licencias",
-]
-H3 = [
-    "Con CalandriApp",
-    "Lo que anda",
-    "Lo que falta probar",
-    "Necesario",
-    "Opcional",
-    "La radio",
-    "El encoder",
-    "GPIO19 y GPIO20: no tocar",
-    "Nodes",
-    "Mensajes",
-    "Teclado en pantalla",
-    "Waypoints",
-    "Radar",
-    "Estado",
-    "Controles",
-    "Primer arranque",
-    "A batería",
-    "Actualizar",
-    "GPS",
-    "Batería 18650",
-    "Carcasa 3D",
-]
+# Identidad 2.0
+NIGHT = (7, 9, 12)
+GRID = (16, 21, 27)
+CONTOUR = (28, 35, 44)
+MESH = (58, 68, 80)
+OUTLINE_C = (138, 147, 157)
+ORANGE = (255, 122, 47)
+CYAN = (92, 225, 230)
+TEXT = (241, 243, 245)
+DIM = (138, 147, 157)
+CONTROL = (42, 50, 60)
+TITLE = (110, 119, 129)  # gris medio: se lee sobre blanco y sobre el oscuro de GitHub
 
 
 def spaced(draw, text, font, x, y, fill, spacing, anchor="lm"):
@@ -89,110 +65,116 @@ def spaced_width(text, font, spacing):
 def draw_mark(d, cx, cy, s):
     bx, by, bw, bh = BOX
     pts = [(cx + (x - (bx + bw / 2)) * s, cy + (y - (by + bh / 2)) * s) for x, y in PTS]
-    lw = max(2, int(s * 0.7))
     for a, b in EDGES:
-        d.line([pts[a], pts[b]], fill=COPPER_DIM, width=max(2, lw - 2))
-    ol = [pts[i] for i in OUTLINE]
+        d.line([pts[a], pts[b]], fill=MESH, width=max(2, int(s * 0.5)))
+    ol = [pts[i] for i in OUTLINE] + [pts[OUTLINE[0]]]
     for i in range(len(ol) - 1):
-        d.line([ol[i], ol[i + 1]], fill=COPPER, width=lw)
+        d.line([ol[i], ol[i + 1]], fill=OUTLINE_C, width=max(2, int(s * 0.7)))
     for i, p in enumerate(pts):
         if i == EYE:
             continue
-        r = s * 1.7
-        d.ellipse((p[0] - r, p[1] - r, p[0] + r, p[1] + r), fill=COPPER)
+        r = s * 1.6
+        d.ellipse((p[0] - r, p[1] - r, p[0] + r, p[1] + r), fill=ORANGE)
     e = pts[EYE]
-    R = s * 3.6
-    d.ellipse((e[0] - R, e[1] - R, e[0] + R, e[1] + R), outline=EYE_C, width=max(2, int(s * 0.9)))
+    R = s * 3.4
+    d.ellipse((e[0] - R, e[1] - R, e[0] + R, e[1] + R), outline=CYAN, width=max(2, int(s * 0.9)))
     r = R * 0.45
-    d.ellipse((e[0] - r, e[1] - r, e[0] + r, e[1] + r), fill=EYE_C)
+    d.ellipse((e[0] - r, e[1] - r, e[0] + r, e[1] + r), fill=CYAN)
 
 
-def banner(font):
+def banner(font, out, name, sub, tag, footer, tag_warn, peaks):
     W, H = 1760, 560
-    im = Image.new("RGB", (W, H))
+    im = Image.new("RGB", (W, H), NIGHT)
     d = ImageDraw.Draw(im)
-    for y in range(H):
-        t = y / H
-        d.line([(0, y), (W, y)], fill=(int(6 + 3 * t), int(10 + 4 * t), int(16 + 6 * t)))
-    # terrain contours (different hills than CalandriApp's banner: same style, another place)
-    topo = Image.new("RGB", (W, H))
-    td = ImageDraw.Draw(topo)
-    for px, py, n, ph in [(330, 430, 9, 1.1), (1420, 80, 8, 2.3), (900, 640, 6, 0.2)]:
+    for x in range(0, W, 40):
+        d.line([(x, 0), (x, H)], fill=GRID, width=1)
+    for y in range(0, H, 40):
+        d.line([(0, y), (W, y)], fill=GRID, width=1)
+    for px, py, n, ph in peaks:
         for k in range(1, n + 1):
-            r = 62 * k
+            r = 58 * k
             pts = []
             for a_ in range(0, 361, 3):
                 a = math.radians(a_)
                 rr = r * (1 + 0.10 * math.sin(3 * a + ph + k * 0.3) + 0.05 * math.sin(5 * a + ph * 2))
-                pts.append((px + rr * math.cos(a), py + rr * math.sin(a) * 1.15))
-            td.line(pts, fill=(30, 52, 64), width=2)
-    im = ImageChops.add(im, topo)
-    mark = Image.new("RGB", (W, H))
-    draw_mark(ImageDraw.Draw(mark), 330, 280, 2.3)
-    im = ImageChops.add(im, ImageChops.add(mark, mark.filter(ImageFilter.GaussianBlur(9)).point(lambda v: int(v * 0.35))))
-    d = ImageDraw.Draw(im)
+                pts.append((px + rr * math.cos(a), py + rr * math.sin(a) * 0.62))
+            d.line(pts, fill=CONTOUR, width=2)
+    draw_mark(d, 330, 280, 2.3)
 
-    x0 = 600
-    f = ImageFont.truetype(font, 100)
-    spaced(d, "CALANDRIA MK1", f, x0, 215, NAME, 18)
-    fs = ImageFont.truetype(MONO, 30)
-    spaced(d, "E-PAPER · LORA · MESHTASTIC", fs, x0 + 4, 305, SUB, 9)
-
-    # "alpha" tag: copper outline, like a node label on the map
-    ft = ImageFont.truetype(MONO, 26)
-    tag = "ALPHA · EN DESARROLLO"
-    tw = spaced_width(tag, ft, 6)
-    tx, ty = x0 + 4, 365
-    d.rounded_rectangle((tx, ty, tx + tw + 36, ty + 50), radius=8, outline=COPPER, width=3)
-    spaced(d, tag, ft, tx + 18, ty + 25, COPPER, 6)
-
-    fp = ImageFont.truetype(font, 28)
-    d.text((W - 60, H - 40), "complemento de CalandriApp · powered by Meshtastic®", font=fp, fill=(110, 130, 140), anchor="rm")
+    x0 = 620
+    size, sp = 96, 22
+    while True:
+        f = ImageFont.truetype(font, size)
+        if spaced_width(name, f, sp) <= W - x0 - 70:
+            break
+        size -= 2
+        sp = max(10, sp - 1)
+    spaced(d, name, f, x0, 222, TEXT, sp)
+    fs = ImageFont.truetype(MONO, 28)
+    spaced(d, sub, fs, x0 + 4, 306, DIM, 9)
+    if tag:
+        ft = ImageFont.truetype(MONO, 24)
+        tw = spaced_width(tag, ft, 6)
+        tx, ty = x0 + 4, 362
+        col = ORANGE if tag_warn else (194, 201, 209)
+        d.rounded_rectangle((tx, ty, tx + tw + 36, ty + 48), radius=12, outline=ORANGE if tag_warn else CONTROL, width=2)
+        spaced(d, tag, ft, tx + 18, ty + 24, col, 6)
+    if footer:
+        fp = ImageFont.truetype(font, 26)
+        d.text((W - 60, H - 42), footer, font=fp, fill=DIM, anchor="rm")
     for x, y, sx, sy in [(28, 28, 1, 1), (W - 28, 28, -1, 1), (28, H - 28, 1, -1), (W - 28, H - 28, -1, -1)]:
-        d.line([(x, y), (x + sx * 44, y)], fill=(40, 110, 125), width=3)
-        d.line([(x, y), (x, y + sy * 44)], fill=(40, 110, 125), width=3)
-    im.save(os.path.join(OUT, "banner.png"), optimize=True)
+        d.line([(x, y), (x + sx * 40, y)], fill=CONTROL, width=3)
+        d.line([(x, y), (x, y + sy * 40)], fill=CONTROL, width=3)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    im.save(out, optimize=True)
 
 
-def slug(t):
-    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")
-
-
-def h2(font, text):
+def h2(font, text, out):
     W, H = 1760, 130
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    f = ImageFont.truetype(font, 74)
-    d.ellipse((6, 52, 30, 76), fill=COPPER + (255,))
-    d.line([(30, 64), (70, 64)], fill=COPPER + (255,), width=4)
-    end = spaced(d, text.upper(), f, 90, 66, COPPER + (255,), 10)
-    d.line([(end + 26, 66), (W - 30, 66)], fill=TEAL + (150,), width=3)
-    d.ellipse((W - 30, 57, W - 12, 75), outline=TEAL + (220,), width=3)
-    im.save(os.path.join(OUT, "titulos", slug(text) + ".png"), optimize=True)
+    f = ImageFont.truetype(font, 70)
+    d.ellipse((8, 54, 30, 76), fill=ORANGE + (255,))
+    end = spaced(d, text.upper(), f, 58, 66, TITLE + (255,), 10)
+    d.line([(end + 28, 66), (W - 34, 66)], fill=TITLE + (110,), width=3)
+    d.ellipse((W - 32, 56, W - 12, 76), outline=CYAN + (255,), width=4)
+    im.save(out, optimize=True)
 
 
-def h3(font, text):
-    f = ImageFont.truetype(font, 54)
-    w = int(spaced_width(text.upper(), f, 6)) + 70
+def h3(font, text, out):
+    f = ImageFont.truetype(font, 52)
+    w = int(spaced_width(text.upper(), f, 6)) + 64
     im = Image.new("RGBA", (w, 84), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    d.ellipse((4, 34, 20, 50), outline=TEAL + (255,), width=4)
-    spaced(d, text.upper(), f, 42, 44, TEAL + (255,), 6)
-    im.save(os.path.join(OUT, "titulos", "s-" + slug(text) + ".png"), optimize=True)
+    d.ellipse((4, 34, 20, 50), outline=ORANGE + (255,), width=4)
+    spaced(d, text.upper(), f, 40, 44, TITLE + (255,), 6)
+    im.save(out, optimize=True)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--barlow", required=True, help="Barlow Regular .ttf")
+    ap.add_argument("--barlow", required=True)
+    ap.add_argument("--readme", required=True)
+    ap.add_argument("--banner", required=True)
+    ap.add_argument("--name", required=True)
+    ap.add_argument("--sub", required=True)
+    ap.add_argument("--tag", default="")
+    ap.add_argument("--tag-warn", action="store_true", help="etiqueta en naranja (p. ej. alpha)")
+    ap.add_argument("--footer", default="")
+    ap.add_argument("--peaks", default="260,90,8,0.6;1500,470,9,1.7;1000,-60,5,2.9",
+                    help="cerros de fondo: x,y,curvas,fase;…")
     a = ap.parse_args()
-    os.makedirs(os.path.join(OUT, "titulos"), exist_ok=True)
-    banner(a.barlow)
-    for t in H2:
-        h2(a.barlow, t)
-    for t in H3:
-        h3(a.barlow, t)
-    print(OUT)
+    peaks = [tuple(float(v) if i == 3 else int(float(v)) for i, v in enumerate(p.split(","))) for p in a.peaks.split(";")]
+    banner(a.barlow, a.banner, a.name, a.sub, a.tag, a.footer, a.tag_warn, peaks)
+    root = os.path.dirname(os.path.abspath(a.readme))
+    md = open(a.readme, encoding="utf-8").read()
+    n = 0
+    for src, alt in re.findall(r'<img src="([^"]*titulos/[^"]+\.png)" alt="([^"]+)"', md):
+        out = os.path.join(root, src)
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        (h3 if os.path.basename(src).startswith("s-") else h2)(a.barlow, alt, out)
+        n += 1
+    print(f"banner + {n} títulos")
 
 
 if __name__ == "__main__":

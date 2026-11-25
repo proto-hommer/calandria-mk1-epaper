@@ -6,7 +6,7 @@ de Seeed cableado a mano. Es el complemento de hardware de [CalandriApp](https:/
 Versión **Calandria 0.6.0** (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
 [![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
-![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-c98245)
+![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-ff7a2f)
 
 > [!WARNING]
 > **Esto está en alpha, en pleno desarrollo.** La radio, la pantalla y el encoder andan y se usan todos
