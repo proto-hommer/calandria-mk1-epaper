@@ -73,6 +73,27 @@ Internal pull-ups are used, so no resistors are needed. If turning goes the wron
 > GPIOs. They are the USB D− / D+ lines, and USB is the only way to flash this board (UART0 is taken
 > by the radio). Using them leaves the board with no practical way to reflash.
 
+## Versions
+
+The Calandria has its own version number, separate from Meshtastic's. The firmware is built on
+**Meshtastic 2.8.3**, and that is what the node reports to the apps. The Calandria version
+follows semantic versioning: **0.x** while in alpha, a patch bump for fixes, a minor bump for new
+features, and 1.0.0 when it leaves alpha. Releases are tagged `calandria-X.Y.Z`.
+
+The first releases used another scheme. Their tags stay as they are:
+
+| Old tag | Calandria |
+|---|---|
+| `v2.8.3-ws154.1` | 0.1.0 |
+| `v2.8.3-ws154.2` | 0.2.0 |
+| `v2.8.3-ws154.3` | 0.3.0 |
+| `v2.8.3-ws154.4` | 0.4.0 |
+| `v2.8.3-ws154.5` | 0.5.0 |
+
+The node shows its version in *Estado*. With CalandriApp connected (1.8.5 or later), *Estado* also
+shows "Firmware nuevo: X.Y.Z" when a newer release is out (the node has no internet: the app tells
+it), and the clock switches to the phone's timezone right away, with no reboot.
+
 ## Flashing a prebuilt release
 
 Download `firmware-calandria-mk1-epaper-*.factory.bin` from the
@@ -132,7 +153,7 @@ Applets added by this variant:
 - **Radar:** the 10 nearest nodes drawn to scale, with an arrow to the nearest one or to the one
   you pinned.
 - **Status:** temperature/humidity (SHTC3), battery, time, direct neighbours, channel
-  utilisation and airtime.
+  utilisation, airtime, the Calandria version and whether a newer one is out.
 
 Your own position comes from the phone over Bluetooth.
 

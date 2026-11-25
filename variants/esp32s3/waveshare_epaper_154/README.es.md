@@ -73,6 +73,28 @@ intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` en `variant.h`.
 > GPIO. Son las líneas D− / D+ del USB, y el USB es la única forma de flashear esta placa (UART0 lo
 > usa la radio). Si los usás, la placa queda sin forma práctica de reflashear.
 
+## Versiones
+
+El Calandria tiene su propio número de versión, aparte del de Meshtastic. El firmware está hecho
+sobre **Meshtastic 2.8.3**, y eso es lo que el nodo les informa a las apps. La versión del
+Calandria es semántica: **0.x** mientras está en alpha, sube el último número con los arreglos y
+el del medio con funciones nuevas, y llega a 1.0.0 cuando deje de ser alpha. Los releases se
+etiquetan `calandria-X.Y.Z`.
+
+Los primeros releases usaban otro esquema. Sus tags quedan como están:
+
+| Tag viejo | Calandria |
+|---|---|
+| `v2.8.3-ws154.1` | 0.1.0 |
+| `v2.8.3-ws154.2` | 0.2.0 |
+| `v2.8.3-ws154.3` | 0.3.0 |
+| `v2.8.3-ws154.4` | 0.4.0 |
+| `v2.8.3-ws154.5` | 0.5.0 |
+
+El nodo muestra su versión en *Estado*. Con CalandriApp conectada (1.8.5 o posterior), *Estado*
+también muestra "Firmware nuevo: X.Y.Z" cuando hay un release más nuevo (el nodo no tiene
+internet: se lo dice la app), y la hora pasa a la zona horaria del celular enseguida, sin reiniciar.
+
 ## Flashear un release ya compilado
 
 Bajá `firmware-calandria-mk1-epaper-*.factory.bin` de la página de
@@ -132,8 +154,8 @@ Applets que agrega esta variante:
 - **Waypoints:** elegís un waypoint y ves la distancia y el rumbo. La brújula va **con el norte
   arriba**: la placa no tiene magnetómetro, así que no puede saber hacia dónde mirás.
 - **Radar:** los 10 nodos más cercanos a escala, con una flecha al más cercano o al que fijaste.
-- **Estado:** temperatura y humedad (SHTC3), batería, hora, vecinos directos, uso del canal y
-  tiempo de aire.
+- **Estado:** temperatura y humedad (SHTC3), batería, hora, vecinos directos, uso del canal,
+  tiempo de aire, la versión del Calandria y si hay una más nueva.
 
 Tu propia posición la toma del celular por Bluetooth.
 
