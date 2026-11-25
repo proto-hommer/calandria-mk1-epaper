@@ -463,6 +463,8 @@ class NodeDB
 
     void initConfigIntervals(), initModuleConfigIntervals(), resetNodes(bool keepFavorites = false),
         removeNodeByNum(NodeNum nodeNum);
+    /// Same as removeNodeByNum() for each node, saving the NodeDB to flash once. @return entries removed
+    size_t removeNodesByNum(const std::vector<NodeNum> &nodeNums);
 
     bool factoryReset(bool eraseBleBonds = false);
 
@@ -817,6 +819,7 @@ class NodeDB
     bool saveChannelsToDisk();
     bool saveDeviceStateToDisk();
     bool saveNodeDatabaseToDisk();
+    int removeNodeByNumNoSave(NodeNum nodeNum); // removeNodeByNum() without the flash write
     void sortMeshDB();
 
     // Defined in NodeDBLegacyMigration.cpp. Decodes /prefs/nodes.proto via

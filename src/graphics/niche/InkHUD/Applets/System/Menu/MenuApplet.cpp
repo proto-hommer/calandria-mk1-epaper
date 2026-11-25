@@ -70,9 +70,8 @@ static size_t forgetGhostNodes()
         if (ghost)
             ghosts.push_back(n->num);
     }
-    // Collected first: removeNodeByNum() compacts meshNodes (and saves it to flash) on each call
-    for (NodeNum num : ghosts)
-        nodeDB->removeNodeByNum(num);
+    // Collected first: removing compacts meshNodes. One flash write for the whole list.
+    nodeDB->removeNodesByNum(ghosts);
     LOG_INFO("Forgot %u ghost nodes", (unsigned)ghosts.size());
     return ghosts.size();
 }

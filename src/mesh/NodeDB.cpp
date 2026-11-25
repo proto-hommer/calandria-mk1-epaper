@@ -2015,6 +2015,24 @@ void NodeDB::resetNodes(bool keepFavorites)
 
 void NodeDB::removeNodeByNum(NodeNum nodeNum)
 {
+    const int removed = removeNodeByNumNoSave(nodeNum);
+    LOG_DEBUG("NodeDB::removeNodeByNum purged %d entries, saving", removed);
+    saveNodeDatabaseToDisk();
+}
+
+size_t NodeDB::removeNodesByNum(const std::vector<NodeNum> &nodeNums)
+{
+    size_t removed = 0;
+    for (NodeNum n : nodeNums)
+        removed += removeNodeByNumNoSave(n);
+    LOG_DEBUG("NodeDB::removeNodesByNum purged %u entries, saving once", (unsigned)removed);
+    if (!nodeNums.empty())
+        saveNodeDatabaseToDisk();
+    return removed;
+}
+
+int NodeDB::removeNodeByNumNoSave(NodeNum nodeNum)
+{
     int newPos = 0, removed = 0;
     for (int i = 0; i < numMeshNodes; i++) {
         if (meshNodes->at(i).num != nodeNum)
@@ -2043,9 +2061,7 @@ void NodeDB::removeNodeByNum(NodeNum nodeNum)
     if (trafficManagementModule)
         trafficManagementModule->purgeNode(nodeNum);
 #endif
-
-    LOG_DEBUG("NodeDB::removeNodeByNum purged %d entries, saving", removed);
-    saveNodeDatabaseToDisk();
+    return removed;
 }
 
 void NodeDB::clearLocalPosition()
