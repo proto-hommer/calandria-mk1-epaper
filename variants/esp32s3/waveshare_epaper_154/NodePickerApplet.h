@@ -11,9 +11,10 @@ InkHUD applet: a scrollable, selectable list of mesh nodes.
 Encoder has a single axis, so this uses InkHUD's grab/release pattern (same as the
 UserAppletInputExample): encoder short-press enters "browse" mode. While browsing, turning
 moves the cursor and short-press opens the node's card: details (hops, SNR, last heard, distance
-and direction) and three actions: "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo),
-"Medir senal" (traceroute via the Estado applet, which is then shown with the result) and "Radar"
-(the Radar applet locked onto this node: arrow + distance). BOOT (EXIT) or encoder
+and direction) and four actions: "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo),
+"Medir senal" (traceroute via the Estado applet, which is then shown with the result), "Radar"
+(the Radar applet locked onto this node: arrow + distance) and "Olvidar nodo" (removed from the
+NodeDB without a reboot, after a second press to confirm). BOOT (EXIT) or encoder
 long-press goes back one level: card -> list -> normal applet navigation. While not
 browsing, turning changes applet as usual, so you are never trapped in the list.
 
@@ -71,6 +72,11 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     {
         (void)full;
         setFont(fontSmall);
+        if (nodeDB->getNumMeshNodes() != builtFrom) { // nodes forgotten from the menu ("Limpiar fantasmas")
+            rebuild();
+            if (card && cursor < nodes.size() && !nodeDB->getMeshNode(nodes[cursor]))
+                card = false;
+        }
         if (card && cursor < nodes.size()) {
             renderCard(nodes[cursor]);
             return;
@@ -232,9 +238,10 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
 
     // ---------- Node card ----------
     bool card = false;   // showing the selected node's card instead of the list
-    uint8_t action = 0;  // 0 = DM, 1 = traceroute, 2 = radar
+    uint8_t action = 0;  // 0 = DM, 1 = traceroute, 2 = radar, 3 = forget
     std::string notice;  // one-line feedback on the card ("espera 20s")
-    static constexpr uint8_t ACTIONS = 3;
+    static constexpr uint8_t ACTIONS = 4;
+    size_t builtFrom = 0; // NodeDB size the list was built from
 
     // Card -> list -> out of the list
     void back()
@@ -290,6 +297,23 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         requestUpdate(EInk::UpdateTypes::FAST);
     }
 
+    // Forget a node (a ghost, a duplicate): removed from the NodeDB, no reboot. If it transmits
+    // again it comes back on its own. Second press confirms.
+    void forget(NodeNum num)
+    {
+        if (notice != CONFIRM_FORGET) {
+            notice = CONFIRM_FORGET;
+            requestUpdate(EInk::UpdateTypes::FAST);
+            return;
+        }
+        nodeDB->removeNodeByNum(num);
+        card = false;
+        notice.clear();
+        rebuild();
+        requestUpdate(EInk::UpdateTypes::FULL);
+    }
+    static constexpr const char *CONFIRM_FORGET = "Pulsá de nuevo: olvidar";
+
     void runAction()
     {
         if (cursor >= nodes.size())
@@ -301,6 +325,10 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         }
         if (action == 2) {
             showRadar(nodes[cursor]);
+            return;
+        }
+        if (action == 3) {
+            forget(nodes[cursor]);
             return;
         }
         uint8_t index = 0;
@@ -361,7 +389,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             printAt(2, y, parse(RadarApplet::haveOwnPosition() ? "Sin posición conocida" : "Distancia: sin GPS propio"));
         y += lineH + 4;
 
-        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal", "Radar"};
+        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal", "Radar", "Olvidar nodo"};
         const uint16_t rowH = lineH + 2;
         for (uint8_t i = 0; i < ACTIONS; i++) {
             if (i == action)
@@ -378,6 +406,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         nodes.clear();
         const NodeNum me = nodeDB->getNodeNum();
         const uint32_t count = nodeDB->getNumMeshNodes();
+        builtFrom = count;
         for (uint32_t i = 0; i < count; i++) {
             meshtastic_NodeInfoLite *node = nodeDB->getMeshNodeByIndex(i);
             if (!node || node->num == me)
