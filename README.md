@@ -1,21 +1,19 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-oscuro.svg">
-    <source media="(prefers-color-scheme: light)" srcset="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-claro.svg">
-    <img alt="CalandriApp" src="variants/esp32s3/waveshare_epaper_154/img/calandriapp-logo-claro.svg" width="200">
-  </picture>
-</p>
+<p align="center"><img src="variants/esp32s3/waveshare_epaper_154/img/readme/banner.png" alt="Calandria MK1: e-paper, LoRa, Meshtastic. Alpha, en desarrollo" width="100%"/></p>
 
-Calandria MK1 epaper
-====================
+**Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa
+de Seeed cableado a mano. Es el complemento de hardware de [CalandriApp](https://github.com/proto-hommer/calandriapp).**
 
-**Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa de Seeed cableado a mano.**
-
-Versión **v2.8.3-ws154.1** | Basado en el [firmware de Meshtastic](https://github.com/meshtastic/firmware) | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
+Versión **v2.8.3-ws154.4** (alpha) | Meshtastic 2.8.3 | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
 [![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
+![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-c98245)
 
-**Cableás diez hilos, flasheás un `.bin` y tenés un nodo Meshtastic con pantalla e-paper que se lee a pleno sol.**
+> [!WARNING]
+> **Esto está en alpha, en pleno desarrollo.** La radio, la pantalla y el encoder andan y se usan todos
+> los días, pero todavía es un prototipo: va en la caja original de la placa, con la radio puenteada a
+> mano, y hay partes sin probar (sobre todo a batería). Cuando estén integrados el **módulo GPS** y la
+> **batería 18650 con su cargador TP4056**, se va a diseñar una **carcasa impresa en 3D** que lo aloje
+> todo. Puede cambiar cualquier cosa de una versión a otra.
 
 <p align="center">
   <img src="variants/esp32s3/waveshare_epaper_154/img/nodes.jpg" alt="Lista de nodos en el e-paper" width="45%"/>
@@ -26,24 +24,61 @@ Versión **v2.8.3-ws154.1** | Basado en el [firmware de Meshtastic](https://gith
 
 * * *
 
-Qué es esto
------------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/que-es-esto.png" alt="Qué es esto" width="100%"/></p>
 
 Meshtastic no trae soporte para la **Waveshare ESP32-S3-ePaper-1.54**. Esta placa tiene ESP32-S3,
 pantalla e-paper, RTC, sensor de temperatura y cargador de batería, pero no tiene radio LoRa.
 Este proyecto le suma un **Seeed Wio-SX1262**, le escribe una variante propia de Meshtastic y le
 agrega una interfaz pensada para usarla con un **encoder rotativo**: elegís un nodo de la lista,
-le escribís con un teclado en pantalla, respondés mensajes, buscás waypoints con una brújula y ves
-en un radar quién tenés cerca.
+le escribís con un teclado en pantalla o con un mensaje rápido, respondés mensajes, buscás waypoints
+con una brújula y ves en un radar quién tenés cerca.
 
-Todo corre sobre **InkHUD**, la interfaz de Meshtastic para pantallas e-paper.
+Todo corre sobre **InkHUD**, la interfaz de Meshtastic para pantallas e-paper. La pantalla se lee a
+pleno sol y no gasta energía mientras no cambia.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-con-calandriapp.png" alt="Con CalandriApp" height="26"/></p>
+
+El Calandria MK1 funciona solo, pero está pensado para ir junto con [CalandriApp](https://github.com/proto-hommer/calandriapp),
+la app Android del proyecto. Como el nodo **todavía no tiene GPS**, el celular le pasa su posición
+por Bluetooth, y la app:
+
+- **lo reconoce como Calandria MK1 epaper**: el nodo se anuncia en un puerto privado (el 323) con su
+  modelo y su firmware, y la app muestra si está al día con el último release de este repo;
+- edita sus **mensajes rápidos** ("OK", "Voy", "Llegué"…), que después se mandan desde la pantalla
+  con el encoder, sin teclado;
+- arma el **grupo cerrado** (canal privado + canal público), que en el nodo aparece con su nombre:
+  `Canal 1: <grupo> (privado)`, `Canal 0: LongFast (público)`.
+
+También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 * * *
 
-Hardware
---------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/estado-del-proyecto.png" alt="Estado del proyecto" width="100%"/></p>
 
-### Necesario
+**Alpha.** Se usa de verdad, pero es un prototipo en desarrollo.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-lo-que-anda.png" alt="Lo que anda" height="26"/></p>
+
+- Radio LoRa (Wio-SX1262), pantalla e-paper y encoder, probados en la placa.
+- Mensajes de canal y directos, responder, teclado en pantalla y aviso **"No entregado"** con el motivo
+  cuando un mensaje vuelve con error.
+- Lista de nodos con ficha, medición de señal (traceroute), radar, brújula de waypoints y pantalla de estado.
+- La posición propia se recupera al reiniciar, sin esperar al celular.
+- Anuncio de identidad para CalandriApp.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-lo-que-falta-probar.png" alt="Lo que falta probar" height="26"/></p>
+
+- **A batería:** que el latch la mantenga prendida al soltar PWR, el apagado completo y el deep sleep.
+- La **lectura de batería**, que no está calibrada contra una medición real.
+- Lo nuevo de la v2.8.3-ws154.4 en la placa: la línea de posición en Estado y los mensajes rápidos al
+  responder o al mandar un DM.
+- **GPS:** el módulo todavía no está instalado.
+
+* * *
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/hardware.png" alt="Hardware" width="100%"/></p>
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-necesario.png" alt="Necesario" height="26"/></p>
 
 | Pieza | Para qué |
 |---|---|
@@ -52,19 +87,18 @@ Hardware
 | **Antena LoRa** de tu banda (915 / 868 / 433 MHz) | Sin antena no se transmite: **conectala antes de energizar** |
 | Cable esmaltado fino | Para puentear la radio a la placa |
 
-### Opcional
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-opcional.png" alt="Opcional" height="26"/></p>
 
 | Pieza | Para qué |
 |---|---|
 | Batería LiPo | Uso portátil. La placa tiene conector y cargador |
 | **Encoder rotativo EC11** con pulsador | Navegación rápida y teclado en pantalla. Hay que desoldar el codec ES8311. Sin encoder, todo se usa con el botón BOOT |
 | Teclado **CardKB** (I2C) | Escribir mensajes más rápido |
-| **GPS NEO-6M** (GY-NEO6MV2) | Próximamente, ver [Lo que viene](#lo-que-viene) |
+| **GPS NEO-6M** (GY-NEO6MV2) | Próximamente, ver "Lo que viene" |
 
 * * *
 
-Cómo se hizo
-------------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/como-se-hizo.png" alt="Cómo se hizo" width="100%"/></p>
 
 El proyecto se armó por etapas. Cada una se compiló y se probó antes de pasar a la siguiente.
 
@@ -108,16 +142,19 @@ segundo en refrescar es un problema. El teclado acumula los clics y redibuja rec
 del último, solo en la zona que cambió.
 
 **7. Applets nuevos:** lista de nodos con ficha y mensaje directo, responder mensajes, brújula de
-waypoints, radar y pantalla de estado (ver [Funciones](#funciones)).
+waypoints, radar y pantalla de estado (ver "Funciones").
 
 **8. Batería.** La placa tiene un **latch de alimentación**: el botón PWR la prende solo mientras
 lo apretás. El firmware pone GPIO17 en alto apenas arranca, para sostenerla, y lo traba con
 `gpio_hold_en` para que sobreviva reinicios y deep sleep. Para apagar, se suelta el latch.
 
+**9. La marca y CalandriApp.** El logo de CalandriApp aparece al prender y al apagar, con
+"powered by MESHTASTIC®" debajo. Para que la app reconozca al nodo (la app oficial lo ve como
+"hardware privado"), el nodo se anuncia en un puerto privado con su modelo y su firmware.
+
 * * *
 
-Cableado
---------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/cableado.png" alt="Cableado" width="100%"/></p>
 
 Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cortar pistas.
 
@@ -126,7 +163,7 @@ Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cor
 </p>
 <p align="center"><i>El cableado dibujado sobre el esquemático. Arriba, los pads de la microSD (TF1); al medio, el header J1; abajo, el Wio-SX1262.</i></p>
 
-### Wio-SX1262 → Waveshare ePaper 1.54
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-radio.png" alt="La radio" height="26"/></p>
 
 ```
   ┌──────────────┐                 ┌──────────────────────────┐
@@ -149,7 +186,7 @@ Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cor
 **Consola:** va por el USB nativo. No conectes adaptadores UART a GPIO43/44.
 **RF_SW:** GPIO3 comparte línea con el LED verde (vía 24K). Es normal que el LED reaccione.
 
-### Encoder EC11 → pads del ES8311 (chip desoldado)
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-el-encoder.png" alt="El encoder" height="26"/></p>
 
 Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 
@@ -174,42 +211,52 @@ Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 **Resistencias:** no hacen falta, se usan los pull-ups internos.
 **Si el giro va al revés:** intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` en `variant.h`.
 
-### ⛔ GPIO19 y GPIO20: no tocar
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-gpio19-y-gpio20-no-tocar.png" alt="GPIO19 y GPIO20: no tocar" height="26"/></p>
 
 Aparecen en el header y en la serigrafía como si fueran GPIO libres, pero **son el USB**. Si los
 usás para otra cosa, la placa queda sin forma práctica de reflashear.
 
 * * *
 
-Funciones
----------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/funciones.png" alt="Funciones" width="100%"/></p>
 
-### Nodes
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-nodes.png" alt="Nodes" height="26"/></p>
+
 La lista de nodos ordenada por último escuchado, con saltos (`d` = directo) y antigüedad. Cada nodo
 abre una **ficha** con SNR y distancia ("a 3 km al NE"), y tres acciones: **Mensaje directo**,
 **Medir señal** (traceroute: con qué SNR nos oyen) y **Radar**.
 
-### Mensajes
-Sobre cualquier conversación, un clic del encoder **responde**: si era un DM, al remitente; si era
-un canal, al canal.
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-mensajes.png" alt="Mensajes" height="26"/></p>
 
-### Teclado en pantalla
+Sobre cualquier conversación, un clic del encoder **responde**: si era un DM, al remitente; si era
+un canal, al canal. Al responder o al mandar un DM aparecen primero los **mensajes rápidos** cargados
+desde la app, y después "Free Text" para escribir. Los canales aparecen con su nombre y dicen cuál es
+el **privado** y cuál el **público**. Si un mensaje no llega, aparece **"No entregado"** con el motivo
+(por ejemplo, "clave" cuando el otro nodo no puede descifrarlo).
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-teclado-en-pantalla.png" alt="Teclado en pantalla" height="26"/></p>
+
 Girás para recorrer las letras, apretás el encoder para elegir y BOOT envía. Tiene minúsculas,
 mayúsculas, números, símbolos, espacio y borrar.
 
-### Waypoints
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-waypoints.png" alt="Waypoints" height="26"/></p>
+
 Elegís un waypoint y ves la **distancia y el rumbo**. La brújula va con el **norte arriba**: la
 placa no tiene magnetómetro, así que no simula una orientación que no existe: la "N" del dial
 siempre marca el norte.
 
-### Radar
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-radar.png" alt="Radar" height="26"/></p>
+
 Los 10 nodos más cercanos dibujados a escala, con una flecha al más cercano o al que fijaste desde
-su ficha.
+su ficha. Después de un reinicio usa la última posición guardada hasta que el celular mande una nueva.
 
-### Estado
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-estado.png" alt="Estado" height="26"/></p>
+
 Temperatura y humedad (SHTC3), batería, hora (RTC), vecinos directos, uso del canal y tiempo de aire.
+También dice de dónde viene tu posición y qué edad tiene: "Posición: del celu hace 40 s",
+"Posición guardada, hace 3 h" o "Sin posición: conectá el celu".
 
-### Controles
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-controles.png" alt="Controles" height="26"/></p>
 
 | Control | Acción |
 |---|---|
@@ -224,8 +271,7 @@ Sin encoder, **todo se puede hacer con BOOT** y el menú.
 
 * * *
 
-Flashear
---------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/flashear.png" alt="Flashear" width="100%"/></p>
 
 1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest).
 2. **Mantené BOOT apretado mientras enchufás el USB** (modo descarga).
@@ -238,21 +284,23 @@ esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-calandria-mk1-epaper
 
 ¿Sin Python? Usá [ESP Tool](https://espressif.github.io/esptool-js/) en Chrome o Edge, con la dirección `0x0`.
 
-### Primer arranque
-Emparejá el nodo con la app de Meshtastic y **configurá la región LoRa** antes que nada. Tu
-posición la toma del celular por Bluetooth.
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-primer-arranque.png" alt="Primer arranque" height="26"/></p>
 
-### A batería
+Emparejá el nodo con CalandriApp o con la app de Meshtastic y **configurá la región LoRa** antes que
+nada. Tu posición la toma del celular por Bluetooth.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-a-bateria.png" alt="A batería" height="26"/></p>
+
 Mantené **PWR apretado 1 o 2 segundos** hasta que aparezca la pantalla. Es el latch de
 alimentación, es normal.
 
-### Actualizar sin perder la configuración
-Flasheá el `.bin` que no es factory en `0x10000`.
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-actualizar.png" alt="Actualizar" height="26"/></p>
+
+Para actualizar sin perder la configuración, flasheá el `.bin` que no es factory en `0x10000`.
 
 * * *
 
-Compilar desde el código
-------------------------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/compilar-desde-el-codigo.png" alt="Compilar desde el código" width="100%"/></p>
 
 ```sh
 # Instalá PlatformIO, cloná este repo y:
@@ -261,21 +309,34 @@ pio run -e calandria-mk1-epaper-headless    # solo radio, para aislar problemas
 ```
 
 El código de la variante está en [`variants/esp32s3/waveshare_epaper_154/`](variants/esp32s3/waveshare_epaper_154/).
+El banner y los títulos de este README salen de `tools/readme_art.py`, con la misma marca y paleta que CalandriApp.
 
 * * *
 
-Lo que viene
-------------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/lo-que-viene.png" alt="Lo que viene" width="100%"/></p>
 
-- **GPS NEO-6M** en el conector del touch (libre en esta versión): TX del GPS a GPIO21, RX a GPIO7.
-  Posición propia sin depender del celular.
-- Validar a batería el apagado completo y el deep sleep.
-- Calibrar la lectura de batería.
+El Calandria MK1 de hoy es la placa en su caja original con la radio puenteada. Lo que sigue lo
+convierte en un equipo terminado:
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-gps.png" alt="GPS" height="26"/></p>
+
+Un **NEO-6M** (GY-NEO6MV2) en el conector del touch, libre en esta versión: TX del GPS a GPIO21,
+RX a GPIO7. Posición propia sin depender del celular, y la brújula usando el rumbo del GPS cuando
+hay movimiento.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-bateria-18650.png" alt="Batería 18650" height="26"/></p>
+
+Una **18650 integrada**, con su módulo de carga **TP4056**, para muchas más horas de uso en el campo.
+Antes: validar a batería el latch, el apagado completo y el deep sleep, y calibrar la lectura de batería.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-carcasa-3d.png" alt="Carcasa 3D" height="26"/></p>
+
+Cuando estén el GPS y la 18650 con su TP4056, se va a **diseñar una carcasa impresa en 3D** que aloje
+la placa, la radio, la batería, el GPS, la antena y el encoder.
 
 * * *
 
-Problemas conocidos
--------------------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/problemas-conocidos.png" alt="Problemas conocidos" width="100%"/></p>
 
 | Problema | Solución |
 |---|---|
@@ -284,17 +345,19 @@ Problemas conocidos
 | La imagen sale corrida o con basura | El panel puede ser otro modelo: probá el driver `ZJY200200_0154DAAMFGN` |
 | El encoder gira al revés | Intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` |
 | No aparece el puerto para flashear | Mantené BOOT al enchufar el USB |
+| "No entregado: … clave" al mandar un DM | El otro nodo tiene una clave tuya vieja: borrá el nodo en los dos lados y dejá que se vuelvan a oír |
 
 * * *
 
-Créditos
---------
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/creditos-marcas-y-licencias.png" alt="Créditos, marcas y licencias" width="100%"/></p>
 
-- [**Meshtastic**](https://meshtastic.org): el firmware, InkHUD y toda la base de este proyecto.
+- **powered by Meshtastic®.** Meshtastic® es una marca registrada de Meshtastic LLC. Este proyecto se
+  basa en el [firmware de Meshtastic](https://github.com/meshtastic/firmware) y en InkHUD. Es un proyecto
+  comunitario independiente: **no es oficial ni está patrocinado ni respaldado por el proyecto
+  Meshtastic ni por Waveshare**. Sin garantía: se usa bajo tu propio riesgo.
 - **Waveshare**: la placa y su [esquemático](https://www.waveshare.com/wiki/ESP32-S3-ePaper-1.54).
 - **Seeed Studio**: el módulo Wio-SX1262.
+- **CalandriApp**: la marca (la calandria dibujada como una malla de nodos, con el ojo como nodo
+  principal) y la app compañera. Los títulos usan la tipografía Barlow (OFL-1.1).
 
-Licencia GPL-3.0, la misma que Meshtastic. Proyecto comunitario no oficial, sin soporte de
-Meshtastic ni de Waveshare.
-
-GitHub: [github.com/proto-hommer/calandria-mk1-epaper](https://github.com/proto-hommer/calandria-mk1-epaper)
+Software libre bajo la **GPL-3.0**, la misma licencia que Meshtastic.

@@ -16,6 +16,11 @@ suma un encoder rotativo EC11 opcional, con interfaz propia: lista de nodos, men
 respuestas, teclado en pantalla, brújula de waypoints, radar de nodos cercanos y pantalla de estado.
 
 > Es un build comunitario no oficial, sin soporte de Meshtastic ni de Waveshare.
+>
+> **Alpha, en desarrollo.** La radio, la pantalla y el encoder andan y se usan todos los días, pero
+> todavía es un prototipo y hay partes sin probar (sobre todo a batería). Cuando estén el **módulo GPS**
+> y la **batería 18650 integrada con su TP4056**, se va a diseñar una **carcasa impresa en 3D**.
+> App compañera: [CalandriApp](https://github.com/proto-hommer/calandriapp).
 
 ## Hardware
 

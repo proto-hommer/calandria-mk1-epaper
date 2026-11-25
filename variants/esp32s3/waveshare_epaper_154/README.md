@@ -16,6 +16,11 @@ adds an optional EC11 rotary encoder with its own UI: node list, direct messages
 on-screen keyboard, a waypoint compass, a radar of nearby nodes and a status screen.
 
 > This is an unofficial community build, not supported by Meshtastic or Waveshare.
+>
+> **Alpha, under development.** Radio, display and encoder work and are used daily, but this is still a
+> prototype and parts are untested (mainly on battery). Once the **GPS module** and an integrated
+> **18650 battery with its TP4056 charger** are in, a **3D-printed enclosure** will be designed.
+> Companion app: [CalandriApp](https://github.com/proto-hommer/calandriapp).
 
 ## Hardware
 
