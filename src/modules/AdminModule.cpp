@@ -926,7 +926,18 @@ void AdminModule::handleSetConfig(const meshtastic_Config &c, bool fromOthers)
             config.device.rebroadcast_mode == c.payload_variant.device.rebroadcast_mode) {
             requiresReboot = false;
         }
+#if !MESHTASTIC_EXCLUDE_TZ
+        // Apply a new timezone now, not only at the next boot (main.cpp): same setenv/tzset, empty = GMT0
+        const bool tzChanged = strcmp(config.device.tzdef, c.payload_variant.device.tzdef) != 0;
+#endif
         config.device = c.payload_variant.device;
+#if !MESHTASTIC_EXCLUDE_TZ
+        if (tzChanged) {
+            setenv("TZ", config.device.tzdef[0] ? config.device.tzdef : "GMT0", 1);
+            tzset();
+            LOG_INFO("Timezone set to %s", getenv("TZ"));
+        }
+#endif
         if (config.device.rebroadcast_mode == meshtastic_Config_DeviceConfig_RebroadcastMode_NONE &&
             (config.device.role == meshtastic_Config_DeviceConfig_Role_ROUTER ||
              config.device.role == meshtastic_Config_DeviceConfig_Role_ROUTER_LATE)) {

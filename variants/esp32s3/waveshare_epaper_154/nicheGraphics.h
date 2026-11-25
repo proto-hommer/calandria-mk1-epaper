@@ -26,6 +26,7 @@
 #include "NodePickerApplet.h"
 #include "RadarApplet.h"
 #include "StatusApplet.h"
+#include "TimezoneWatcher.h"
 #include "WaypointCompassApplet.h"
 
 #include "NodeDB.h"
@@ -191,6 +192,8 @@ void setupNicheGraphics()
 
     // "No entregado" pop-up when one of our messages is NAKed (needs the Notification applet, so after begin)
     new InkHUD::DeliveryWatcher();
+    // Timezone set from the phone at runtime (no reboot): redraw the clocks
+    new InkHUD::TimezoneWatcher();
 
     // Input layer: sources emit abstract events, InkHudNavigator maps them to InkHUD.
     // Registering a source is this + its begin(); the navigator never changes.
