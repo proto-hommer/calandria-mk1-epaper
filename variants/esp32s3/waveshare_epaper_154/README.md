@@ -126,7 +126,7 @@ Applets added by this variant:
 - **Ghost nodes:** after a reflash or a board swap a node can get a new number, and the old one
   stays in the list under the same name. *Menu → Node Config → Reset NodeDB → Limpiar fantasmas*
   forgets the older duplicates (same long name, heard earlier) and nodes not heard for over 7
-  days, without a reboot. Same rule as CalandriApp's *Clean up ghosts*.
+  days, without a reboot. Favorites and ignored nodes are kept. Same rule as CalandriApp's *Clean up ghosts*.
 - **Waypoints:** pick a waypoint to see its distance and bearing. The compass is **north-up**:
   the board has no magnetometer, so it cannot know which way you are facing.
 - **Radar:** the 10 nearest nodes drawn to scale, with an arrow to the nearest one or to the one

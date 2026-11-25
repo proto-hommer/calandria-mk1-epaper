@@ -128,7 +128,7 @@ Applets que agrega esta variante:
 - **Nodos fantasma:** al reflashear o cambiar la placa, un nodo puede cambiar de número y el viejo
   queda en la lista con el mismo nombre. *Menú → Node Config → Reset NodeDB → Limpiar fantasmas*
   olvida los duplicados más viejos (mismo nombre largo, oídos antes) y los que no se oyen hace más
-  de 7 días, sin reiniciar. Es el mismo criterio que *Limpiar fantasmas* de CalandriApp.
+  de 7 días, sin reiniciar. Los favoritos y los ignorados no se tocan. Es el mismo criterio que *Limpiar fantasmas* de CalandriApp.
 - **Waypoints:** elegís un waypoint y ves la distancia y el rumbo. La brújula va **con el norte
   arriba**: la placa no tiene magnetómetro, así que no puede saber hacia dónde mirás.
 - **Radar:** los 10 nodos más cercanos a escala, con una flecha al más cercano o al que fijaste.
