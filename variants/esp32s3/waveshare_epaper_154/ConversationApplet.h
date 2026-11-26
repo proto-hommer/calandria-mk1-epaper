@@ -25,7 +25,8 @@ Messages come from the global MessageStore. Gaps of the stock InkHUD are filled 
   - our own DMs sent from the node are stored when they are sent (recordSent: from our canned replies and,
     through MenuApplet::onTextSent, from the keyboard). Router::sendLocal() loops back broadcasts only,
     so a DM never reaches handleReceived(); if one ever does, its packet id is already known and it is
-    not stored twice. DMs sent from the phone are not seen by the node's UI at all;
+    not stored twice. DMs sent from the phone go the same way, through MeshService::onTextFromPhone
+    (the stock code stores them only in screen builds);
   - the routing ACKs of what we sent mark it delivered / relayed / failed.
 Reactions (a reply carrying an emoji) are stored as plain messages: the emoji, or "(emoji)" when the
 font lacks it.
@@ -72,6 +73,10 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         instance = this;
         loopbackOk = true; // our own broadcasts and the ACKs our router raises arrive as local packets
         MenuApplet::onTextSent = [](const meshtastic_MeshPacket &p) {
+            if (instance)
+                instance->recordSent(p);
+        };
+        MeshService::onTextFromPhone = [](const meshtastic_MeshPacket &p) {
             if (instance)
                 instance->recordSent(p);
         };

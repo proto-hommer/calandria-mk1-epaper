@@ -338,6 +338,10 @@ void MeshService::handleToRadio(meshtastic_MeshPacket &p)
                   if (const StoredMessage *sm = messageStore.tryAddFromPacket(p))
                       graphics::MessageRenderer::handleNewMessage(nullptr, *sm, p); // notify UI
               })
+    if (onTextFromPhone && p.which_payload_variant == meshtastic_MeshPacket_decoded_tag &&
+        p.decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP && p.decoded.payload.size > 0 && p.to != NODENUM_BROADCAST &&
+        p.to != 0) // DM only: broadcasts come back through the loopback
+        onTextFromPhone(p);
 #if !MESHTASTIC_EXCLUDE_ADMIN
     // Note admin requests on their way out: AdminModule only accepts a response from a remote we
     // actually asked. Runs before encryption, while the payload is still readable.

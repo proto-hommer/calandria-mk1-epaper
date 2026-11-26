@@ -177,6 +177,11 @@ class MeshService
      */
     void handleToRadio(meshtastic_MeshPacket &p);
 
+    /// Optional: told about every text DM the phone sends, in handleToRadio() once its id is set and
+    /// from = 0. A UI without a screen build (HAS_SCREEN=0, e.g. InkHUD) does not store those DMs, and
+    /// Router::sendLocal() never loops a DM back to the modules. nullptr by default.
+    static inline void (*onTextFromPhone)(const meshtastic_MeshPacket &p) = nullptr;
+
     /// Transparent mode: hand a raw LoRa frame to the client without decrypting it. Takes ownership of p.
     void handleTransparentFromRadio(meshtastic_MeshPacket *p);
 
