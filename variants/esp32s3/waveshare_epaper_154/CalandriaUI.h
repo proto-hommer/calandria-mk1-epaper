@@ -195,6 +195,26 @@ template <class Base> class CalandriaUI : public Base
         return ((deg % 360) + 360) % 360;
     }
 
+    // Message text for the panel: parse() maps UTF-8 to the font (common emoji included: 👋 👍 ❤ 😂…);
+    // anything the font lacks comes back as SUB (0x1A), drawn as a box. Say "(emoji)" instead, once per run.
+    std::string readable(const std::string &utf8)
+    {
+        const std::string s = this->parse(utf8);
+        std::string out;
+        bool inRun = false;
+        for (char c : s) {
+            if (c == '\x1A') {
+                if (!inRun)
+                    out += "(emoji)";
+                inRun = true;
+                continue;
+            }
+            inRun = false;
+            out += c;
+        }
+        return out;
+    }
+
     std::string shortNameOf(NodeNum num)
     {
         if (num == nodeDB->getNodeNum())

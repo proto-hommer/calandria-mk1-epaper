@@ -17,9 +17,14 @@ MENSAJES: the card itself is the list of conversations; a conversation is the th
            (MenuApplet::composeTo, free text only). A canned message is sent right away.
 BOOT goes back one level (REPLY -> THREAD -> LIST); from LIST, InkHudNavigator goes back to Inicio.
 
-Messages come from the global MessageStore. Two gaps of the stock InkHUD are filled here, as a
-MeshModule: our own DMs sent from the node are stored (the store only gets the phone's), and the
-routing ACKs of what we sent mark it delivered / relayed / failed.
+Messages come from the global MessageStore. Gaps of the stock InkHUD are filled here, as a MeshModule:
+  - channel messages (incoming and ours) are stored by ThreadedMessageApplet, but only while that
+    applet is active (and there is one for channels 0 and 1 only). We store them whenever no active
+    ThreadedMessageApplet does it for that channel: each message ends up in the store exactly once;
+  - our own DMs (sent from the node or the phone) are stored: the stock code only stores incoming ones;
+  - the routing ACKs of what we sent mark it delivered / relayed / failed.
+Reactions (a reply carrying an emoji) are stored as plain messages: the emoji, or "(emoji)" when the
+font lacks it.
 
 Unread counts live here (per channel and per peer) and are shown by Inicio: they only go down when the
 conversation is opened, not when a message pops up on its own.
@@ -45,6 +50,7 @@ conversation is opened, not when a message pops up on its own.
 #include "modules/TextMessageModule.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <map>
@@ -145,15 +151,18 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         if (p->which_payload_variant != meshtastic_MeshPacket_decoded_tag)
             return false;
         if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP)
-            return isFromUs(p);
+            return isFromUs(p) || p->to == NODENUM_BROADCAST;
         return p->decoded.portnum == meshtastic_PortNum_ROUTING_APP && p->decoded.request_id != 0 && isToUs(p);
     }
 
     ProcessMessage handleReceived(const meshtastic_MeshPacket &mp) override
     {
-        if (mp.decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP)
-            noteSent(mp);
-        else
+        if (mp.decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
+            if (mp.to == NODENUM_BROADCAST)
+                storeChannelMessage(mp);
+            if (isFromUs(&mp))
+                noteSent(mp);
+        } else
             noteRouting(mp);
         return ProcessMessage::CONTINUE;
     }
@@ -251,6 +260,28 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         sent.push_back(s);
         if (isForeground())
             requestUpdate(EInk::UpdateTypes::FAST);
+    }
+
+    // A channel message (anyone's): into the store, unless the channel's ThreadedMessageApplet does it
+    void storeChannelMessage(const meshtastic_MeshPacket &mp)
+    {
+        if (channelAppletStores(mp.channel) || !messageStore.shouldStorePacket(mp))
+            return;
+        const StoredMessage *m = messageStore.tryAddFromPacket(mp);
+        if (m && isFromUs(&mp))
+            const_cast<StoredMessage &>(*m).ackStatus = AckStatus::NONE; // until someone repeats it
+        if (isForeground())
+            requestUpdate(EInk::UpdateTypes::FAST);
+    }
+
+    // Same test ThreadedMessageApplet::handleReceived() makes before storing: its name and isActive()
+    bool channelAppletStores(uint8_t channel)
+    {
+        for (Applet *a : inkhud->userApplets)
+            if (a && a->name && !strncmp(a->name, AppletNames::CHANNEL_PREFIX, AppletNames::CHANNEL_PREFIX_LEN) &&
+                atoi(a->name + AppletNames::CHANNEL_PREFIX_LEN) == channel)
+                return a->isActive();
+        return false;
     }
 
     // ACK / NAK for one of ours: find the stored message (newest own one with that text) and mark it
@@ -542,7 +573,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
             else {
                 const NodeNum me = nodeDB->getNodeNum();
                 std::string who = last->sender == me ? "Vos: " : c.dm ? "" : shortNameOf(last->sender) + ": ";
-                preview = who + parse(MessageStore::getText(*last));
+                preview = who + readable(MessageStore::getText(*last));
             }
             setFont(fontSmall);
             setCrop(4, y, width() - 8, rowH);
@@ -556,7 +587,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     uint16_t blockHeight(const StoredMessage &m, uint16_t textW)
     {
         setFont(fontSmall);
-        return fontSmall.lineHeight() + getWrappedTextHeight(4, textW, parse(MessageStore::getText(m))) + 6;
+        return fontSmall.lineHeight() + getWrappedTextHeight(4, textW, readable(MessageStore::getText(m))) + 6;
     }
 
     void renderThread()
@@ -633,7 +664,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
             // underline the header, dotted
             for (int16_t dx = 4; dx < width() - 4; dx += 2)
                 drawPixel(dx, y + 2 + fontSmall.lineHeight(), fg);
-            printWrapped(4, y + 4 + fontSmall.lineHeight(), textW, parse(MessageStore::getText(m)));
+            printWrapped(4, y + 4 + fontSmall.lineHeight(), textW, readable(MessageStore::getText(m)));
             setTextColor(BLACK);
             y += h;
         }
@@ -653,7 +684,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
             const StoredMessage &q = *thread[msgCursor];
             const NodeNum me = nodeDB->getNodeNum();
             const std::string text =
-                (q.sender == me ? std::string("Vos") : shortNameOf(q.sender)) + ": " + parse(MessageStore::getText(q));
+                (q.sender == me ? std::string("Vos") : shortNameOf(q.sender)) + ": " + readable(MessageStore::getText(q));
             const uint16_t maxH = fontSmall.lineHeight() * 3 + 2;
             const uint16_t h = std::min<uint16_t>(maxH, getWrappedTextHeight(6, width() - 12, text)) + 4;
             for (int16_t k = 0; k < 2; k++)

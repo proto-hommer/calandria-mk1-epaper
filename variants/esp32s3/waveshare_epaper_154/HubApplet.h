@@ -346,7 +346,7 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
             else {
                 const StoredMessage &m = all.back();
                 const std::string who = m.sender == nodeDB->getNodeNum() ? std::string("Vos") : shortNameOf(m.sender);
-                summary = who + ": " + parse(MessageStore::getText(m));
+                summary = who + ": " + readable(MessageStore::getText(m));
             }
             const uint16_t unread = ConversationApplet::totalUnread();
             counter = unread ? std::to_string(unread) : "";

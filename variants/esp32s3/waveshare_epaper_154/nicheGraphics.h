@@ -36,6 +36,8 @@
 #include "mesh/Channels.h"
 
 #include <cstdio>
+#include <cstring>
+#include <string>
 
 // Menu name of a channel applet: "Canal 1: Amigos (privado)". "público" = the well-known default key,
 // "privado" = your own key. Read once at boot (fonts must already be set: the menu prints names
@@ -181,22 +183,36 @@ void setupNicheGraphics()
     // Found by the boot I2C scan; with it attached the on-screen keyboard is never shown.
     Inputs::CardKbInput::getInstance()->detect();
 
-    // The encoder is the only input, so the joystick UI must always be on. begin() calls
-    // loadSettings() and would overwrite a plain default with the stored value, so load here,
-    // force it on, and persist once. This must run AFTER addApplet() and maxCount: if nothing is
-    // stored, loadSettings() keeps the current settings (applet defaults included), so the file
-    // we save is complete instead of "every applet inactive".
+    // Settings we enforce (joystick UI for the encoder, migrations, the Inicio layout) must be SAVED
+    // before begin(): begin() calls loadSettings() again, which replaces what is in memory with what
+    // is in flash. So: load, change, save if anything changed, then begin() reloads the same values.
+    // This must run AFTER addApplet() and maxCount: if nothing is stored (or the stored version is
+    // old), loadSettings() keeps the current settings (applet defaults included), so the file we save
+    // is complete instead of "every applet inactive".
     inkhud->persistence->loadSettings();
-    if (!inkhud->persistence->settings.joystick.enabled || !inkhud->persistence->settings.joystick.aligned) {
-        inkhud->persistence->settings.joystick.enabled = true;  // encoder drives nav
-        inkhud->persistence->settings.joystick.aligned = true;  // skip AlignStick: no 4-way to align
-        inkhud->persistence->settings.joystick.alignment = 0;
-        inkhud->persistence->saveSettings();
-    }
+    const InkHUD::Persistence::Settings loaded = inkhud->persistence->settings;
+    inkhud->persistence->settings.joystick.enabled = true; // the encoder drives nav
+    inkhud->persistence->settings.joystick.aligned = true; // skip AlignStick: no 4-way to align
+    inkhud->persistence->settings.joystick.alignment = 0;
     migrateAppletSettings(inkhud);
     arrangeForHub(inkhud);
+    const auto &now = inkhud->persistence->settings; // compared field by field: no struct padding
+    if (memcmp(&loaded.userTiles, &now.userTiles, sizeof(now.userTiles)) ||
+        memcmp(&loaded.userApplets, &now.userApplets, sizeof(now.userApplets)) ||
+        loaded.joystick.enabled != now.joystick.enabled || loaded.joystick.aligned != now.joystick.aligned ||
+        loaded.joystick.alignment != now.joystick.alignment)
+        inkhud->persistence->saveSettings();
 
     inkhud->begin();
+
+    // Which applets run: the channel applets store channel messages (MENSAJES reads them)
+    {
+        std::string active;
+        for (size_t i = 0; i < inkhud->userApplets.size(); i++)
+            if (inkhud->userApplets[i]->isActive())
+                active += std::to_string(i) + ",";
+        LOG_INFO("InkHUD active applets: %s", active.c_str());
+    }
 
     // "No entregado" pop-up when one of our messages is NAKed (needs the Notification applet, so after begin)
     new InkHUD::DeliveryWatcher();
