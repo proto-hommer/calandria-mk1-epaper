@@ -373,8 +373,9 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         }
     }
 
-    // Same as a timezone set from the app (AdminModule): applied now, saved, clocks redrawn
-    // (TimezoneWatcher listens to configChanged)
+    // Same as a timezone set from the app (AdminModule): applied now and saved. No reloadConfig(): it
+    // would re-apply the radio settings for a change that does not touch the radio. Clocks are redrawn
+    // by the FULL refresh that closes this page.
     static void setTimezone(const char *tz)
     {
         strncpy(config.device.tzdef, tz, sizeof(config.device.tzdef) - 1);
@@ -382,7 +383,6 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         setenv("TZ", tz, 1);
         tzset();
         nodeDB->saveToDisk(SEGMENT_CONFIG);
-        service->reloadConfig(SEGMENT_CONFIG);
     }
 
     std::string tzLabel()

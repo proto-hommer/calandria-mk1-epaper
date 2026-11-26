@@ -60,6 +60,8 @@ class TrackApplet : public CalandriaUI<Applet>, public concurrency::OSThread
         subscribe();
     }
 
+    Mode currentMode() const { return mode; }
+
     void onActivate() override
     {
         subscribe();

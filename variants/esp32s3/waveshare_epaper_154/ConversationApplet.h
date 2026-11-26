@@ -8,7 +8,8 @@
 
 MENSAJES: the card itself is the list of conversations; a conversation is the thing inside it.
 
-  LIST   : Grupo (channel 0) and Público (channel 1) first, then one row per direct conversation,
+  LIST   : Grupo (channel 0), Público (channel 1) and any other channel in use first, then one row per
+           direct conversation,
            newest first. Each row: name, how long ago, the start of the last message, and a dot when
            it has unread messages. Click opens the conversation (and marks it read).
   THREAD : the messages, oldest at the top, the newest one selected. Each: sender, time, hops (ours:
@@ -331,7 +332,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     {
         const Conv keep = cursor < convs.size() ? convs[cursor] : Conv();
         convs.clear();
-        for (uint8_t ch = 0; ch < 2; ch++)
+        for (uint8_t ch = 0; ch < 8; ch++) // every channel in use: their unread messages must be reachable
             if (channelUsed(ch)) {
                 Conv c;
                 c.id = ch;
@@ -388,7 +389,9 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     {
         if (c.dm)
             return longNameOf(c.id);
-        return parse(c.id == 0 ? "Grupo" : c.id == 1 ? "Público" : "Canal");
+        if (c.id < 2)
+            return parse(c.id == 0 ? "Grupo" : "Público");
+        return parse(fmt("Canal %u: ", (unsigned)c.id) + channels.getName(c.id));
     }
 
     static uint32_t ageOf(const StoredMessage &m)
@@ -489,6 +492,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
 
     void chooseReply()
     {
+        buildThread(); // fresh pointers: the store may have dropped old messages since the last render
         NodeNum dest;
         uint8_t channel;
         replyTarget(&dest, &channel);

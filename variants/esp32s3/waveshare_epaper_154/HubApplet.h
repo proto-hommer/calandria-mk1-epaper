@@ -116,6 +116,8 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
             if (a && a == routeApplet(i)) {
                 cursor = ROUTE;
                 item = i;
+                if (a == byName(AppletNames::TRACK)) // one applet, two entries: the one it was opened as
+                    item = static_cast<TrackApplet *>(a)->currentMode() == TrackApplet::MINE ? 3 : 0;
                 setLevel(CARD);
                 showSelf();
                 return;
