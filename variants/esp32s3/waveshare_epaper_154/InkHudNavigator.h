@@ -65,6 +65,7 @@ class InkHudNavigator
             back(h, longPress);
             break;
         }
+        noteShown(h);
     }
 
     // Used by EncoderInput to decide when to defer the on-screen keyboard redraw.
@@ -81,6 +82,26 @@ class InkHudNavigator
     //   BOOT long:     back to Inicio from anywhere (keyboard: cancel)
     // Our applets subscribe EXIT_SHORT / BUTTON_LONG only while they have a level of their own to
     // close (a node card, a compass), so BOOT reaches the navigator when they are at their top.
+    // A new message pops up on its own (autoshow): BOOT there goes back to where you were.
+
+    // The user applet on screen after the last input. If another one is on screen at the next input,
+    // it came up by itself (autoshow).
+    InkHUD::Applet *lastShown = nullptr;
+
+    bool isUserApplet(InkHUD::InkHUD *h, InkHUD::Applet *a)
+    {
+        for (InkHUD::Applet *u : h->userApplets)
+            if (u == a)
+                return true;
+        return false;
+    }
+
+    void noteShown(InkHUD::InkHUD *h)
+    {
+        InkHUD::Applet *a = h->getActiveApplet();
+        if (!systemOwnsInput(h) && isUserApplet(h, a))
+            lastShown = a;
+    }
 
     void rotate(InkHUD::InkHUD *h, bool down)
     {
@@ -88,7 +109,6 @@ class InkHudNavigator
         InkHUD::Applet::InputMask want = down ? InkHUD::Applet::NAV_DOWN : InkHUD::Applet::NAV_UP;
         if (!systemOwnsInput(h) && !(active && active->isInputSubscribed(want)))
             return; // nothing to move through here
-        noteMessageRead(h);
         down ? h->navDown() : h->navUp();
     }
 
@@ -107,7 +127,6 @@ class InkHudNavigator
             longPress ? h->longpress() : h->shortpress();
             return;
         }
-        noteMessageRead(h);
         if (longPress) {
             if (active->isInputSubscribed(InkHUD::Applet::BUTTON_LONG))
                 h->longpress();
@@ -122,16 +141,14 @@ class InkHudNavigator
         // otherwise nothing to choose here (InkHUD's default would open the menu)
     }
 
-    static bool isMessageApplet(InkHUD::Applet *a) { return InkHUD::HubApplet::isMessageApplet(a); }
+    static bool isMessageApplet(InkHUD::Applet *a)
+    {
+        using namespace AppletNames;
+        return a && a->name &&
+               (!strcmp(a->name, ALL_MESSAGES) || !strcmp(a->name, DMS) || !strncmp(a->name, CHANNEL_PREFIX, CHANNEL_PREFIX_LEN));
+    }
 
     static bool nameIs(InkHUD::Applet *a, const char *n) { return a->name && strcmp(a->name, n) == 0; }
-
-    // Using a message applet = its messages have been seen (Inicio's unread counter)
-    void noteMessageRead(InkHUD::InkHUD *h)
-    {
-        if (!systemOwnsInput(h) && isMessageApplet(h->getActiveApplet()))
-            InkHUD::HubApplet::markRead();
-    }
 
     // Reply to the latest message this applet shows: a DM goes back to its sender as a DM, a
     // channel message is answered on that channel. Reuses MenuApplet::composeTo (keyboard + send).
@@ -188,7 +205,11 @@ class InkHudNavigator
             h->openMenu(); // top level: the InkHUD menu (settings, shutdown...)
             return;
         }
-        hub->openCardOf(active);
+        if (lastShown && lastShown != active && isUserApplet(h, lastShown) && lastShown->isActive()) {
+            hub->show(lastShown); // it popped up by itself: back to where you were, as you left it
+            return;
+        }
+        hub->back(active);
     }
 
     bool activeWants(InkHUD::InkHUD *h, InkHUD::Applet::InputMask mask)

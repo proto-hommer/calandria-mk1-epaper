@@ -50,7 +50,7 @@ using namespace NicheGraphics;
 // come back un-ignored). Removed without a reboot, unlike Reset NodeDB.
 static constexpr uint32_t GHOST_STALE_DAYS = 7;
 
-static size_t forgetGhostNodes()
+size_t InkHUD::MenuApplet::forgetGhostNodes()
 {
     const NodeNum me = nodeDB->getNodeNum();
     const uint32_t now = getValidTime(RTCQualityDevice);
@@ -2621,15 +2621,17 @@ void InkHUD::MenuApplet::onNavRight()
     }
 }
 
-void InkHUD::MenuApplet::composeTo(NodeNum dest, ChannelIndex channel)
+void InkHUD::MenuApplet::composeTo(NodeNum dest, ChannelIndex channel, bool freeTextOnly)
 {
     // The menu must already be in the foreground (openMenu). Jump straight to free-text entry
     // for a fixed recipient, mirroring the FREE_TEXT menu action. With canned messages stored, offer
-    // them first (COMPOSE_TO page): free text is then one item of that list.
+    // them first (COMPOSE_TO page): free text is then one item of that list. freeTextOnly: the caller
+    // already offered them, so go straight to the keyboard (and cancelling closes the menu).
     composePreset = true;
     composeDest = dest;
     composeChannel = channel;
-    if (cm.store && cm.store->size() > 0) {
+    composeFreeTextOnly = freeTextOnly;
+    if (!freeTextOnly && cm.store && cm.store->size() > 0) {
         cursorShown = true;
         showPage(MenuPage::COMPOSE_TO);
         requestUpdate(Drivers::EInk::UpdateTypes::FAST);
@@ -2699,7 +2701,7 @@ void InkHUD::MenuApplet::onFreeTextCancel()
 
     // composeTo(): back to the canned message list if there is one, otherwise close the menu
     if (composePreset) {
-        if (cm.store && cm.store->size() > 0) {
+        if (!composeFreeTextOnly && cm.store && cm.store->size() > 0) {
             showPage(MenuPage::COMPOSE_TO);
         } else {
             composePreset = false;

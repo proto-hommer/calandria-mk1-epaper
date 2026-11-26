@@ -12,7 +12,8 @@ Subclasses WaypointListApplet so it keeps the same slot in the applet list (save
 index) and the menu's "Remove Waypoint" page keeps working (asWaypointListApplet()).
 
 Opened from Inicio > RUMBO:
-  PICK    : the waypoints with a cursor (turning moves it), encoder short opens the compass.
+  PICK    : the waypoints, nearest first, with their distance; turning moves the selection, click
+            opens the compass.
   LIST    : the stock list, only while there are no waypoints (its "no waypoints" screen).
   COMPASS : arrow to the waypoint, NORTH UP (no magnetometer: we know the bearing to the target,
             never which way the user faces). Distance + bearing in degrees.
@@ -24,6 +25,8 @@ back to the RUMBO card.
 
 #include "graphics/niche/InkHUD/Applets/User/Waypoints/WaypointListApplet.h"
 
+#include "CalandriaUI.h"
+
 #include "GeoCoord.h"
 #include "NodeDB.h"
 #include "RTC.h"
@@ -33,25 +36,31 @@ back to the RUMBO card.
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace NicheGraphics::InkHUD
 {
 
-class WaypointCompassApplet : public WaypointListApplet
+class WaypointCompassApplet : public CalandriaUI<WaypointListApplet>
 {
   public:
+    // Entered from RUMBO: the list, nearest first
+    void enter()
+    {
+        cursor = 0;
+        scroll = 0;
+        sortByDistance();
+        setLevel(topLevel());
+    }
+
     void onActivate() override
     {
         WaypointListApplet::onActivate();
         setLevel(topLevel());
     }
 
-    void onForeground() override
-    {
-        WaypointListApplet::onForeground();
-        cursor = 0;
-        setLevel(topLevel());
-    }
+    void onForeground() override { WaypointListApplet::onForeground(); }
 
     void onRender(bool full) override
     {
@@ -77,6 +86,7 @@ class WaypointCompassApplet : public WaypointListApplet
             return;
         if (level == LIST) {
             cursor = 0;
+            sortByDistance();
             setLevel(PICK);
             requestUpdate(EInk::UpdateTypes::FAST);
         } else if (level == PICK) {
@@ -94,7 +104,7 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor > 0) {
             cursor--;
-            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
+            requestUpdate(EInk::UpdateTypes::FAST);
         }
     }
 
@@ -102,38 +112,17 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         if (level == PICK && cursor + 1 < waypointStore.getWaypoints().size()) {
             cursor++;
-            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
+            requestUpdate(EInk::UpdateTypes::FAST);
         }
     }
 
   private:
 
-    // E-paper: a black highlight bar, inverted on every step, ghosts badly with partial refreshes.
-    // Use a double outline instead, and do a FULL refresh when the move scrolls to a new page
-    // (every row changes); moves inside the page stay FAST.
-    void drawSelection(int16_t y, uint16_t rowH)
-    {
-        drawRect(0, y, width(), rowH, BLACK);
-        drawRect(1, y + 1, width() - 2, rowH - 2, BLACK);
-    }
-
-    uint16_t listRows()
-    {
-        const int16_t top = getHeaderHeight() + 2;
-        const uint16_t rowH = fontSmall.lineHeight() + 2;
-        const uint16_t rows = (height() - top) / rowH;
-        return rows ? rows : 1;
-    }
-
-    EInk::UpdateTypes navUpdateType()
-    {
-        const bool pageTurn = cursor < scroll || cursor >= scroll + listRows();
-        return pageTurn ? EInk::UpdateTypes::FULL : EInk::UpdateTypes::FAST;
-    }
     enum Level { LIST, PICK, COMPASS };
     Level level = LIST;
     uint16_t cursor = 0;
     uint16_t scroll = 0;
+    std::vector<uint16_t> order; // indexes into the store, nearest first
 
     Level topLevel() { return waypointStore.getWaypoints().empty() ? LIST : PICK; }
 
@@ -155,14 +144,41 @@ class WaypointCompassApplet : public WaypointListApplet
         requestUpdate(EInk::UpdateTypes::FAST);
     }
 
+    // Distance from us, or -1 if either position is unknown
+    float distanceTo(const meshtastic_Waypoint &w)
+    {
+        meshtastic_PositionLite own = meshtastic_PositionLite_init_zero;
+        if (!w.has_latitude_i || !w.has_longitude_i || !ownPosition(own))
+            return -1;
+        return GeoCoord::latLongToMeter(own.latitude_i * 1e-7, own.longitude_i * 1e-7, w.latitude_i * 1e-7,
+                                        w.longitude_i * 1e-7);
+    }
+
+    // Nearest first; without a distance, at the end in store order
+    void sortByDistance()
+    {
+        const auto &wps = waypointStore.getWaypoints();
+        std::vector<std::pair<float, uint16_t>> d;
+        for (uint16_t i = 0; i < wps.size(); i++) {
+            const float m = distanceTo(wps.at(i).waypoint);
+            d.push_back({m < 0 ? 1e12f + i : m, i});
+        }
+        std::sort(d.begin(), d.end());
+        order.clear();
+        for (const auto &x : d)
+            order.push_back(x.second);
+    }
+
     const StoredWaypoint *selected()
     {
         const auto &wps = waypointStore.getWaypoints();
         if (wps.empty())
             return nullptr;
+        if (order.size() != wps.size())
+            sortByDistance(); // added / expired under us
         if (cursor >= wps.size())
             cursor = wps.size() - 1;
-        return &wps.at(cursor);
+        return &wps.at(order[cursor]);
     }
 
     // Same source as the stock list: our node's position in NodeDB (GPS, phone, or fixed).
@@ -183,14 +199,13 @@ class WaypointCompassApplet : public WaypointListApplet
     void renderPick()
     {
         const auto &wps = waypointStore.getWaypoints();
+        if (order.size() != wps.size())
+            sortByDistance();
+        drawBar("WAYPOINTS", std::to_string(wps.size()), true);
         setFont(fontSmall);
-        drawHeader("Waypoints");
-
-        const int16_t top = getHeaderHeight() + 2;
-        const uint16_t rowH = fontSmall.lineHeight() + 2;
-        uint16_t rows = (height() - top) / rowH;
-        if (rows < 1)
-            rows = 1;
+        const int16_t top = barHeight() + 1;
+        const uint16_t rowH = fontSmall.lineHeight() + 6;
+        uint16_t rows = std::max<uint16_t>(1, (height() - top) / rowH);
         if (cursor < scroll)
             scroll = cursor;
         if (cursor >= scroll + rows)
@@ -199,20 +214,28 @@ class WaypointCompassApplet : public WaypointListApplet
         for (uint16_t r = 0; r < rows && scroll + r < wps.size(); r++) {
             const uint16_t i = scroll + r;
             const int16_t y = top + r * rowH;
-            const bool sel = i == cursor;
-            if (sel)
-                drawSelection(y, rowH);
+            const uint16_t fg = beginRow(y, rowH, i == cursor);
+            const meshtastic_Waypoint &w = wps.at(order[i]).waypoint;
+            const float m = distanceTo(w);
+            uint16_t rightW = 0;
+            if (m >= 0) {
+                const std::string d = localizeDistance((uint32_t)lroundf(m));
+                printAt(width() - 4, y + rowH / 2, d, RIGHT, MIDDLE);
+                rightW = getTextWidth(d) + 8;
+            }
+            setCrop(0, y, width() - rightW, rowH);
+            printAt(6, y + rowH / 2, nameOf(w), LEFT, MIDDLE);
+            resetCrop();
+            (void)fg;
             setTextColor(BLACK);
-            printAt(2, y + 1, nameOf(wps.at(i).waypoint));
         }
-        setTextColor(BLACK);
         drawScrollHints(scroll > 0, scroll + rows < wps.size());
     }
 
     void renderCompass(const meshtastic_Waypoint &w)
     {
         setFont(fontSmall);
-        drawHeader(nameOf(w));
+        drawBar(nameOf(w), "", true);
 
         const int16_t top = getHeaderHeight();
         const int16_t textH = fontMedium.lineHeight() + 2 * fontSmall.lineHeight() + 8;

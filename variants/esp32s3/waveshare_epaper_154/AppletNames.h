@@ -20,4 +20,6 @@ constexpr const char *NODES = "Nodes";
 constexpr const char *POSITIONS = "Positions";
 constexpr const char *STATUS = "Estado";
 constexpr const char *HOME = "Inicio";
+constexpr const char *CONVERSATIONS = "Mensajes";
+constexpr const char *TRACK = "Rumbo";
 } // namespace NicheGraphics::AppletNames

@@ -43,7 +43,9 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
 
     // Compose a DM to a fixed node: skip the message/recipient pages, open the keyboard,
     // and send on done. Call right after the menu is brought to the foreground (openMenu).
-    void composeTo(NodeNum dest, ChannelIndex channel);
+    void composeTo(NodeNum dest, ChannelIndex channel, bool freeTextOnly = false);
+    // "Limpiar fantasmas": forget duplicates and nodes unheard for 7 days (not favorites / ignored)
+    static size_t forgetGhostNodes();
 
   protected:
     Drivers::LatchingBacklight *backlight = nullptr; // Convenient access to the backlight singleton
@@ -84,6 +86,7 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     bool composePreset = false;
     NodeNum composeDest = 0;
     ChannelIndex composeChannel = 0;
+    bool composeFreeTextOnly = false; // composeTo(..., true): keyboard only, cancel closes the menu
     size_t composeFirstCanned = 0; // COMPOSE_TO page: index of the first canned message item
     uint16_t systemInfoPanelHeight = 0; // Need to know before we render
     uint16_t menuTextLimit = 200;

@@ -6,29 +6,35 @@
 
 /*
 
-"Inicio": the top of a two-level navigation. Level HOME shows four cards (MENSAJES, NODOS, RUMBO,
-ESTADO), each with an icon, a one-line summary and a counter. Clicking a card opens level CARD: the
-list of what lives inside it. Clicking an entry shows that (existing) applet with
-InkHUD::showApplet(). InkHudNavigator brings us back: BOOT from an applet returns to the card that
-contains it (openCardOf), holding BOOT returns HOME (goHome).
+"Inicio": the top of a two-level navigation. Four cards (MENSAJES, NODOS, RUMBO, ESTADO), each with an
+icon, a one-line summary and a counter. Clicking a card opens it:
 
-The applets inside the cards are the same ones as before, found by the name they are registered
-under (AppletNames.h), so this file does not care about their indexes.
+  MENSAJES -> ConversationApplet (its list of conversations IS the card)
+  NODOS    -> NodePickerApplet   (its list of nodes)
+  ESTADO   -> StatusApplet       (its boxes and list)
+  RUMBO    -> a list drawn here: Rastrear un nodo, Waypoints, Mapa del grupo, Mi posición
+
+InkHudNavigator brings us back: BOOT from an applet goes back one level (back()), holding BOOT returns
+HOME (goHome). A card applet is reset when entered from here (enter()), never when it merely comes
+back to the foreground (after the menu, the keyboard, a child applet...).
 
 E-paper: the selection is drawn inverted (black bar, white text). Moving it is a FAST refresh (no
-flashing); entering or leaving a card is FULL, which also clears any grey left by the bar. HOME is redrawn on its own only when
-something on it changes (counters, summaries, the clock's minute), checked every HUB_REFRESH_MS.
+flashing); entering or leaving a card is FULL, which also clears any grey left by the bar. HOME is redrawn
+on its own only when something on it changes (counters, summaries, the clock's minute), checked every
+HUB_REFRESH_MS.
 
 */
 
-#include "graphics/niche/InkHUD/Applet.h"
+#include "CalandriaUI.h"
 
 #include "AppletNames.h"
+#include "ConversationApplet.h"
+#include "NavReturn.h"
+#include "NodePickerApplet.h"
 #include "OwnPosition.h"
-#include "graphics/niche/InkHUD/InkHUD.h"
-#include "graphics/niche/InkHUD/Persistence.h"
-#include "graphics/niche/InkHUD/SystemApplet.h"
-#include "graphics/niche/InkHUD/Tile.h"
+#include "StatusApplet.h"
+#include "TrackApplet.h"
+#include "WaypointCompassApplet.h"
 
 #include "MessageStore.h"
 #include "NodeDB.h"
@@ -51,7 +57,7 @@ something on it changes (counters, summaries, the clock's minute), checked every
 namespace NicheGraphics::InkHUD
 {
 
-class HubApplet : public Applet, public concurrency::OSThread
+class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
 {
   public:
     enum Card : uint8_t { MESSAGES, NODES, ROUTE, STATUS, CARDS };
@@ -69,7 +75,7 @@ class HubApplet : public Applet, public concurrency::OSThread
         textMessageObserver.observe(textMessageModule);
         OSThread::enabled = true;
         OSThread::setIntervalFromNow(HUB_REFRESH_MS);
-        setLevel(HOME);
+        setLevel(level);
     }
 
     void onDeactivate() override
@@ -85,43 +91,46 @@ class HubApplet : public Applet, public concurrency::OSThread
     // Hold BOOT: back to the four cards
     void goHome()
     {
+        NavReturn::clear();
         setLevel(HOME);
         showSelf();
     }
 
-    // BOOT inside an applet: back to the card that contains it (HOME if none does)
-    void openCardOf(Applet *a)
+    // BOOT in an applet at its own top level: back to whoever opened it
+    void back(Applet *a)
     {
+        if (a && a == NavReturn::child && NavReturn::parent) { // e.g. Radar -> the node list
+            Applet *p = NavReturn::parent;
+            NavReturn::clear();
+            show(p);
+            return;
+        }
+        NavReturn::clear();
         for (uint8_t c = 0; c < CARDS; c++)
-            for (uint8_t i = 0; i < itemCount((Card)c); i++)
-                if (appletFor((Card)c, i) == a) {
-                    card = (Card)c;
-                    item = i;
-                    setLevel(CARD);
-                    showSelf();
-                    return;
-                }
+            if (a && a == cardApplet((Card)c)) { // a card itself: back to Inicio, on that card
+                cursor = c;
+                goHome();
+                return;
+            }
+        for (uint8_t i = 0; i < ROUTE_ITEMS; i++) // something inside RUMBO
+            if (a && a == routeApplet(i)) {
+                cursor = ROUTE;
+                item = i;
+                setLevel(CARD);
+                showSelf();
+                return;
+            }
         goHome();
     }
 
-    bool atHome() { return level == HOME; }
-
-    // Any message applet in use: its messages count as read
-    static void markRead()
+    // Bring an applet back as it was (no reset)
+    void show(Applet *a)
     {
-        if (!unread)
+        const int i = indexOf(a);
+        if (i < 0)
             return;
-        unread = 0;
-        if (instance && instance->isForeground())
-            instance->requestUpdate(EInk::UpdateTypes::FAST);
-    }
-
-    static bool isMessageApplet(Applet *a)
-    {
-        using namespace AppletNames;
-        return a && a->name &&
-               (strcmp(a->name, ALL_MESSAGES) == 0 || strcmp(a->name, DMS) == 0 ||
-                strncmp(a->name, CHANNEL_PREFIX, CHANNEL_PREFIX_LEN) == 0);
+        ensureActive((uint8_t)i);
+        inkhud->showApplet((uint8_t)i);
     }
 
     // ---------- InkHUD ----------
@@ -129,29 +138,26 @@ class HubApplet : public Applet, public concurrency::OSThread
     void onRender(bool full) override
     {
         (void)full;
+        lastSignature = signature();
         if (level == HOME)
             renderHome();
         else
-            renderCard();
+            renderRoute();
     }
 
     void onButtonShortPress() override
     {
-        if (level == HOME) {
-            card = (Card)cursor;
-            item = 0;
-            setLevel(CARD);
-            requestUpdate(EInk::UpdateTypes::FULL);
-        } else {
-            openItem(card, item);
-        }
+        if (level == HOME)
+            openCard((Card)cursor);
+        else
+            openRouteItem(item);
     }
 
-    // Level CARD only (subscribed there): back to HOME
+    // RUMBO list only (subscribed there): back to HOME
     void onButtonLongPress() override { onExitShort(); }
     void onExitShort() override
     {
-        cursor = card;
+        cursor = ROUTE;
         setLevel(HOME);
         requestUpdate(EInk::UpdateTypes::FULL);
     }
@@ -163,32 +169,20 @@ class HubApplet : public Applet, public concurrency::OSThread
     // Redraw HOME only when what it shows has changed
     int32_t runOnce() override
     {
-        if (isForeground() && level == HOME) {
-            const std::string s = signature();
-            if (s != lastSignature) {
-                lastSignature = s;
-                requestUpdate(EInk::UpdateTypes::FAST);
-            }
-        }
+        if (isForeground() && level == HOME && signature() != lastSignature)
+            requestUpdate(EInk::UpdateTypes::FAST);
         return HUB_REFRESH_MS;
     }
 
   private:
     enum Level : uint8_t { HOME, CARD };
-    enum Kind : uint8_t { APPLET, CHANNEL, MENU };
-    struct Item {
-        const char *label; // nullptr: use the applet's own name (channels)
-        Kind kind;
-        const char *applet; // AppletNames::*, or the channel index as text for CHANNEL
-    };
+    static constexpr uint8_t ROUTE_ITEMS = 4;
 
     static inline HubApplet *instance = nullptr;
-    static inline uint16_t unread = 0;
 
     Level level = HOME;
-    Card card = MESSAGES;
     uint8_t cursor = 0; // HOME: which card
-    uint8_t item = 0;   // CARD: which entry
+    uint8_t item = 0;   // RUMBO: which entry
     std::string lastSignature;
 
     static const char *cardName(Card c)
@@ -197,58 +191,53 @@ class HubApplet : public Applet, public concurrency::OSThread
         return names[c];
     }
 
-    // What lives inside each card. Stage 1: the existing applets, unchanged.
-    static uint8_t itemCount(Card c)
+    // ---------- Applets behind the cards ----------
+    int indexOf(Applet *a)
     {
-        static const uint8_t counts[CARDS] = {4, 2, 2, 2};
-        return counts[c];
+        for (size_t n = 0; n < inkhud->userApplets.size(); n++)
+            if (inkhud->userApplets[n] == a)
+                return (int)n;
+        return -1;
     }
 
-    static const Item &itemAt(Card c, uint8_t i)
+    Applet *byName(const char *name)
     {
-        using namespace AppletNames;
-        static const Item items[CARDS][4] = {
-            {{"Todos los mensajes", APPLET, ALL_MESSAGES}, {"Directos", APPLET, DMS}, {nullptr, CHANNEL, "0"},
-             {nullptr, CHANNEL, "1"}},
-            {{"Últimos oídos", APPLET, AppletNames::NODES}, {"Radar: los 10 más cerca", APPLET, RADAR}},
-            {{"Waypoints", APPLET, WAYPOINTS}, {"Mapa del grupo", APPLET, POSITIONS}},
-            {{"Estado", APPLET, AppletNames::STATUS}, {"Ajustes", MENU, nullptr}},
-        };
-        return items[c][i];
-    }
-
-    // The user applet behind an entry, by name (channels: "Canal N...")
-    Applet *appletFor(Card c, uint8_t i, uint8_t *index = nullptr)
-    {
-        const Item &it = itemAt(c, i);
-        if (it.kind == MENU)
-            return nullptr;
-        for (size_t n = 0; n < inkhud->userApplets.size(); n++) {
-            Applet *a = inkhud->userApplets[n];
-            if (!a || !a->name)
-                continue;
-            bool match;
-            if (it.kind == CHANNEL)
-                match = strncmp(a->name, AppletNames::CHANNEL_PREFIX, AppletNames::CHANNEL_PREFIX_LEN) == 0 &&
-                        a->name[AppletNames::CHANNEL_PREFIX_LEN] == it.applet[0];
-            else
-                match = strcmp(a->name, it.applet) == 0;
-            if (match) {
-                if (index)
-                    *index = (uint8_t)n;
+        for (Applet *a : inkhud->userApplets)
+            if (a && a->name && strcmp(a->name, name) == 0)
                 return a;
-            }
-        }
         return nullptr;
     }
 
-    std::string labelFor(Card c, uint8_t i)
+    Applet *cardApplet(Card c)
     {
-        const Item &it = itemAt(c, i);
-        if (it.label)
-            return parse(it.label);
-        Applet *a = appletFor(c, i);
-        return a ? std::string(a->name) : std::string("Canal ") + it.applet; // channel names are already font-encoded
+        switch (c) {
+        case MESSAGES:
+            return byName(AppletNames::CONVERSATIONS);
+        case NODES:
+            return byName(AppletNames::NODES);
+        case STATUS:
+            return byName(AppletNames::STATUS);
+        default:
+            return nullptr; // RUMBO is a list drawn here
+        }
+    }
+
+    static const char *routeLabel(uint8_t i)
+    {
+        static const char *labels[ROUTE_ITEMS] = {"Rastrear un nodo", "Waypoints", "Mapa del grupo", "Mi posición"};
+        return labels[i];
+    }
+
+    Applet *routeApplet(uint8_t i)
+    {
+        switch (i) {
+        case 1:
+            return byName(AppletNames::WAYPOINTS);
+        case 2:
+            return byName(AppletNames::POSITIONS);
+        default:
+            return byName(AppletNames::TRACK); // track a node / my position
+        }
     }
 
     void setLevel(Level l)
@@ -260,7 +249,7 @@ class HubApplet : public Applet, public concurrency::OSThread
 
     void move(int dir)
     {
-        const uint8_t n = level == HOME ? (uint8_t)CARDS : itemCount(card);
+        const uint8_t n = level == HOME ? (uint8_t)CARDS : ROUTE_ITEMS;
         uint8_t &pos = level == HOME ? cursor : item;
         const int next = (int)pos + dir;
         if (next < 0 || next >= n)
@@ -271,18 +260,19 @@ class HubApplet : public Applet, public concurrency::OSThread
 
     void showSelf()
     {
-        for (size_t n = 0; n < inkhud->userApplets.size(); n++)
-            if (inkhud->userApplets[n] == this) {
-                ensureActive((uint8_t)n);
-                if (isForeground())
-                    requestUpdate(EInk::UpdateTypes::FULL);
-                else
-                    inkhud->showApplet((uint8_t)n);
-                return;
-            }
+        if (isForeground()) {
+            requestUpdate(EInk::UpdateTypes::FULL);
+            return;
+        }
+        const int i = indexOf(this);
+        if (i < 0)
+            return;
+        ensureActive((uint8_t)i);
+        inkhud->showApplet((uint8_t)i);
+        requestUpdate(EInk::UpdateTypes::FULL);
     }
 
-    // An applet switched off from the menu's "Applets" page would make its entry a dead end
+    // An applet switched off from the menu's "Applets" page would make its card a dead end
     void ensureActive(uint8_t index)
     {
         Applet *a = inkhud->userApplets[index];
@@ -292,69 +282,73 @@ class HubApplet : public Applet, public concurrency::OSThread
         a->activate();
     }
 
-    void openItem(Card c, uint8_t i)
+    void showFresh(Applet *a)
     {
-        if (itemAt(c, i).kind == MENU) {
-            inkhud->openMenu();
+        NavReturn::clear();
+        inkhud->showApplet((uint8_t)indexOf(a));
+        inkhud->forceUpdate(EInk::UpdateTypes::FULL);
+    }
+
+    // Entering resets the card's applet to its first screen
+    void openCard(Card c)
+    {
+        if (c == ROUTE) {
+            item = 0;
+            setLevel(CARD);
+            requestUpdate(EInk::UpdateTypes::FULL);
             return;
         }
-        uint8_t index = 0;
-        if (!appletFor(c, i, &index))
+        Applet *a = cardApplet(c);
+        if (!a)
             return;
-        ensureActive(index);
+        ensureActive((uint8_t)indexOf(a));
         if (c == MESSAGES)
-            markRead();
-        inkhud->showApplet(index);
+            static_cast<ConversationApplet *>(a)->enter();
+        else if (c == NODES)
+            static_cast<NodePickerApplet *>(a)->enter();
+        else
+            static_cast<StatusApplet *>(a)->enter();
+        showFresh(a);
+    }
+
+    void openRouteItem(uint8_t i)
+    {
+        Applet *a = routeApplet(i);
+        if (!a)
+            return;
+        ensureActive((uint8_t)indexOf(a));
+        if (i == 0 || i == 3)
+            static_cast<TrackApplet *>(a)->enter(i == 0 ? TrackApplet::TRACK : TrackApplet::MINE);
+        else if (i == 1)
+            static_cast<WaypointCompassApplet *>(a)->enter();
+        showFresh(a);
     }
 
     // ---------- Data for the cards ----------
-
     int onReceiveTextMessage(const meshtastic_MeshPacket *p)
     {
-        if (p && p->from != 0 && p->from != nodeDB->getNodeNum()) {
-            unread++;
-            if (isForeground())
-                requestUpdate(EInk::UpdateTypes::FAST);
-        }
+        (void)p;
+        if (isForeground())
+            requestUpdate(EInk::UpdateTypes::FAST); // counters / last message
         return 0;
     }
     CallbackObserver<HubApplet, const meshtastic_MeshPacket *> textMessageObserver =
         CallbackObserver<HubApplet, const meshtastic_MeshPacket *>(this, &HubApplet::onReceiveTextMessage);
 
-    static std::string ago(uint32_t s)
-    {
-        char buf[16];
-        if (s < 60)
-            return "recién";
-        if (s < 3600)
-            snprintf(buf, sizeof(buf), "%lu min", (unsigned long)(s / 60));
-        else if (s < 86400)
-            snprintf(buf, sizeof(buf), "%lu h", (unsigned long)(s / 3600));
-        else
-            snprintf(buf, sizeof(buf), "%lu d", (unsigned long)(s / 86400));
-        return buf;
-    }
-
-    std::string shortNameOf(NodeNum num)
-    {
-        meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(num);
-        if (n && nodeInfoLiteHasUser(n) && n->short_name[0])
-            return parseShortName(n);
-        return hexifyNodeNum(num);
-    }
-
     // Summary line and right-hand counter of a card
     void cardInfo(Card c, std::string &summary, std::string &counter)
     {
-        char buf[48];
         switch (c) {
         case MESSAGES: {
-            const auto &latest = inkhud->persistence->latestMessage;
-            const StoredMessage &m = latest.wasBroadcast ? latest.broadcast : latest.dm;
-            if (!m.sender)
+            const auto &all = messageStore.getLiveMessages();
+            if (all.empty())
                 summary = "Sin mensajes";
-            else
-                summary = shortNameOf(m.sender) + ": " + parse(std::string(MessageStore::getText(m)));
+            else {
+                const StoredMessage &m = all.back();
+                const std::string who = m.sender == nodeDB->getNodeNum() ? std::string("Vos") : shortNameOf(m.sender);
+                summary = who + ": " + parse(MessageStore::getText(m));
+            }
+            const uint16_t unread = ConversationApplet::totalUnread();
             counter = unread ? std::to_string(unread) : "";
             break;
         }
@@ -370,39 +364,35 @@ class HubApplet : public Applet, public concurrency::OSThread
                 if (!n->last_heard)
                     continue;
                 const uint32_t s = sinceLastSeen(n);
-                if (s < newest)
-                    newest = s;
-                if (s <= settings->recentlyActiveSeconds)
+                newest = std::min(newest, s);
+                if (s <= 3600) // heard within the hour: not lost (as a client)
                     active++;
             }
             if (!total)
-                summary = "Sin nodos todavía";
+                summary = parse("Sin nodos todavía");
             else if (newest == UINT32_MAX)
-                summary = std::to_string(total) + " en la lista";
-            else {
-                snprintf(buf, sizeof(buf), "%u activos · último ", active);
-                summary = parse(buf) + parse(newest < 60 ? std::string("recién") : "hace " + ago(newest));
-            }
+                summary = fmt("%u en la lista", total);
+            else
+                summary =
+                    parse(fmt("%u activos · último ", active) + (newest < 60 ? std::string("recién") : "hace " + ago(newest)));
             counter = std::to_string(total);
             break;
         }
         case ROUTE: {
             const size_t wps = waypointStore.getWaypoints().size();
-            snprintf(buf, sizeof(buf), "%u waypoint%s · ", (unsigned)wps, wps == 1 ? "" : "s");
-            summary = parse(buf) + parse(OwnPosition::have() ? "con posición" : "sin posición");
+            summary = parse(fmt("Rastrear · %u waypoint%s", (unsigned)wps, wps == 1 ? "" : "s") +
+                            (OwnPosition::have() ? "" : " · sin posición"));
             counter = std::to_string(wps);
             break;
         }
         default: {
-            const bool usb = powerStatus && powerStatus->getHasUSB();
-            const bool charging = powerStatus && powerStatus->getIsCharging();
-            summary = charging ? "Cargando" : usb ? "Enchufada" : "A batería";
+            summary = charging() ? "Cargando" : plugged() ? "Enchufada" : "A batería";
             summary += config.network.wifi_enabled ? " · WiFi prendido" : " · WiFi apagado";
             summary = parse(summary);
             if (powerStatus && powerStatus->getHasBattery())
                 counter = std::to_string(powerStatus->getBatteryChargePercent()) + "%";
             else
-                counter = usb ? "USB" : "--";
+                counter = plugged() ? "USB" : "--";
             break;
         }
         }
@@ -410,10 +400,17 @@ class HubApplet : public Applet, public concurrency::OSThread
 
     std::string clock() { return getValidTime(RTCQuality::RTCQualityDevice) ? getTimeString() : std::string("--:--"); }
 
+    std::string batteryText()
+    {
+        if (powerStatus && powerStatus->getHasBattery())
+            return std::to_string(powerStatus->getBatteryChargePercent()) + "%";
+        return "";
+    }
+
     // Everything HOME shows: redraw only when this changes
     std::string signature()
     {
-        std::string s = clock();
+        std::string s = clock() + batteryText() + (plugged() ? "+" : "");
         for (uint8_t c = 0; c < CARDS; c++) {
             std::string a, b;
             cardInfo((Card)c, a, b);
@@ -424,63 +421,17 @@ class HubApplet : public Applet, public concurrency::OSThread
 
     // ---------- Drawing ----------
 
-    // Right edge of the black title bar: stop short of InkHUD's battery icon, which draws itself there
-    int16_t barRight()
-    {
-        if (!settings->optionalFeatures.batteryIcon)
-            return width();
-        Tile *t = ((Applet *)inkhud->getSystemApplet("BatteryIcon"))->getTile();
-        return t ? t->getLeft() - 3 : width();
-    }
-
-    uint16_t barHeight() { return getHeaderHeight(); }
-
-    // Black title bar: left text (with "<" when there is a level above) and a right-hand datum
-    void drawBar(const std::string &left, const std::string &right, bool backArrow, bool bolt)
-    {
-        const int16_t r = barRight();
-        const uint16_t h = barHeight();
-        fillRect(0, 0, r, h, BLACK);
-        setFont(fontSmall);
-        setTextColor(WHITE);
-        int16_t x = 3;
-        if (backArrow) {
-            const int16_t cy = h / 2;
-            for (int k = 0; k < 2; k++) {
-                drawLine(x + 4 + k, cy - 4, x + k, cy, WHITE);
-                drawLine(x + k, cy, x + 4 + k, cy + 4, WHITE);
-            }
-            x += 10;
-        }
-        printAt(x, h / 2, left, LEFT, MIDDLE);
-        int16_t rx = r - 3;
-        if (!right.empty()) {
-            printAt(rx, h / 2, right, RIGHT, MIDDLE);
-            rx -= getTextWidth(right) + 4;
-        }
-        if (bolt) // plugged in
-            drawBolt(rx - 5, h / 2, WHITE);
-        setTextColor(BLACK);
-    }
-
-    void drawBolt(int16_t cx, int16_t cy, uint16_t color)
-    {
-        fillTriangle(cx + 1, cy - 5, cx - 3, cy + 1, cx, cy + 1, color);
-        fillTriangle(cx - 1, cy + 5, cx + 3, cy - 1, cx, cy - 1, color);
-    }
-
     // 16 px pictograms, drawn with primitives so they invert with the row
     void drawIcon(Card c, int16_t x, int16_t cy, uint16_t color)
     {
         const int16_t y = cy - 8;
         switch (c) {
-        case MESSAGES: // speech bubble
-            drawRoundRect(x, y + 1, 16, 11, 3, color);
-            fillTriangle(x + 3, y + 11, x + 8, y + 11, x + 3, y + 15, color);
-            drawLine(x + 4, y + 5, x + 11, y + 5, color);
-            drawLine(x + 4, y + 8, x + 9, y + 8, color);
+        case MESSAGES: // an envelope
+            drawRect(x, y + 3, 16, 11, color);
+            drawLine(x, y + 3, x + 8, y + 9, color);
+            drawLine(x + 8, y + 9, x + 15, y + 3, color);
             break;
-        case NODES: // three linked nodes
+        case NODES: // three linked dots
             drawLine(x + 3, y + 12, x + 8, y + 3, color);
             drawLine(x + 8, y + 3, x + 13, y + 12, color);
             drawLine(x + 3, y + 12, x + 13, y + 12, color);
@@ -488,47 +439,45 @@ class HubApplet : public Applet, public concurrency::OSThread
             fillCircle(x + 8, y + 3, 3, color);
             fillCircle(x + 13, y + 12, 3, color);
             break;
-        case ROUTE: // compass
+        case ROUTE: // a compass
             drawCircle(x + 8, y + 8, 7, color);
             fillTriangle(x + 8, y + 2, x + 5, y + 9, x + 11, y + 9, color);
             drawLine(x + 8, y + 9, x + 8, y + 13, color);
             break;
-        default: // signal / level bars
-            fillRect(x + 1, y + 10, 3, 5, color);
-            fillRect(x + 6, y + 6, 3, 9, color);
-            fillRect(x + 11, y + 2, 3, 13, color);
+        default: // a battery
+            drawRect(x, y + 4, 14, 9, color);
+            fillRect(x + 14, y + 6, 2, 5, color);
+            fillRect(x + 2, y + 6, 7, 5, color);
             break;
         }
     }
 
     void renderHome()
     {
-        const bool usb = powerStatus && powerStatus->getHasUSB();
-        std::string me = owner.short_name[0] ? parse(owner.short_name) : std::string("Calandria");
-        drawBar(me, clock(), false, usb);
+        const std::string me = owner.short_name[0] ? parse(owner.short_name) : std::string("Calandria");
+        std::string right = clock();
+        const std::string bat = batteryText();
+        if (!bat.empty())
+            right = bat + "  " + right;
+        drawBar(me, right, false, plugged());
 
         const int16_t top = barHeight() + 1;
         const uint16_t rowH = (height() - top) / CARDS;
         for (uint8_t c = 0; c < CARDS; c++) {
             const int16_t y = top + c * rowH;
             const bool sel = c == cursor;
-            const uint16_t fg = sel ? WHITE : BLACK;
-            if (sel)
-                fillRect(0, y, width(), rowH, BLACK);
-            else if (c > 0)
-                for (int16_t x = 0; x < width(); x += 2)
-                    drawPixel(x, y, BLACK); // dotted separator
+            if (!sel && c > 0)
+                dottedLine(y);
+            const uint16_t fg = beginRow(y, rowH, sel);
 
             std::string summary, counter;
             cardInfo((Card)c, summary, counter);
-
             drawIcon((Card)c, 4, y + rowH / 2 - 5, fg);
-            setTextColor(fg);
 
             // Counter on the right; unread messages in a circle
-            int16_t right = width() - 4;
             setFont(fontMedium);
             if (!counter.empty()) {
+                const int16_t right = width() - 4;
                 const int16_t cy = y + rowH / 2 - 5;
                 if (c == MESSAGES) {
                     const int16_t rad = std::max<int16_t>(9, getTextWidth(counter) / 2 + 4);
@@ -536,10 +485,8 @@ class HubApplet : public Applet, public concurrency::OSThread
                     setTextColor(sel ? BLACK : WHITE);
                     printAt(right - rad, cy, counter, CENTER, MIDDLE);
                     setTextColor(fg);
-                    right -= 2 * rad + 4;
                 } else {
                     printAt(right, cy, counter, RIGHT, MIDDLE);
-                    right -= getTextWidth(counter) + 6;
                 }
             }
 
@@ -553,39 +500,28 @@ class HubApplet : public Applet, public concurrency::OSThread
         }
     }
 
-    void renderCard()
+    void renderRoute()
     {
-        std::string summary, counter;
-        cardInfo(card, summary, counter);
-        drawBar(cardName(card), counter, true, false);
-
+        drawBar("RUMBO", "", true);
         const int16_t top = barHeight() + 4;
         setFont(fontMedium);
         const uint16_t rowH = fontMedium.lineHeight() + 10;
-        const uint8_t n = itemCount(card);
-        for (uint8_t i = 0; i < n; i++) {
+        for (uint8_t i = 0; i < ROUTE_ITEMS; i++) {
             const int16_t y = top + i * rowH;
-            const bool sel = i == item;
-            if (sel)
-                fillRect(0, y, width(), rowH, BLACK);
-            setTextColor(sel ? WHITE : BLACK);
+            const uint16_t fg = beginRow(y, rowH, i == item);
             setCrop(0, y, width() - 14, rowH);
-            printAt(6, y + rowH / 2, labelFor(card, i), LEFT, MIDDLE);
+            printAt(6, y + rowH / 2, parse(routeLabel(i)), LEFT, MIDDLE);
             resetCrop();
-            // ">" on the right: opens something
-            const int16_t cx = width() - 9, cy = y + rowH / 2;
-            const uint16_t col = sel ? WHITE : BLACK;
-            drawLine(cx, cy - 4, cx + 4, cy, col);
-            drawLine(cx + 4, cy, cx, cy + 4, col);
+            drawChevron(width() - 9, y + rowH / 2, fg);
             setTextColor(BLACK);
         }
 
-        // The card's summary under the entries, as a reminder of what is new
+        // No GPS on the MK1: the position comes from the phone
         setFont(fontSmall);
-        const int16_t y = top + n * rowH + 6;
+        const int16_t y = top + ROUTE_ITEMS * rowH + 6;
         if (y + fontSmall.lineHeight() < height()) {
             setCrop(0, y, width(), height() - y);
-            printWrapped(4, y, width() - 8, summary);
+            printWrapped(4, y, width() - 8, parse(OwnPosition::statusLine()));
             resetCrop();
         }
     }

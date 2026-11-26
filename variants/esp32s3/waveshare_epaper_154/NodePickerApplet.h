@@ -6,27 +6,34 @@
 
 /*
 
-InkHUD applet: a scrollable, selectable list of mesh nodes.
+NODOS: the card itself is the list of nodes ("Últimos oídos"); a node's card is the thing inside it.
 
-Opened from Inicio > NODOS, it is browsable right away: turning moves the cursor and short-press opens
-the node's card: details (hops, SNR, last heard, distance and direction) and four actions: "Mensaje
-directo" (keyboard, handed off to MenuApplet::composeTo), "Medir senal" (traceroute via the Estado
-applet, which is then shown with the result), "Radar" (the Radar applet locked onto this node: arrow +
-distance) and "Olvidar nodo" (removed from the NodeDB without a reboot, after a second press to
-confirm). BOOT (EXIT) or encoder long-press closes the card; from the list they reach InkHudNavigator,
-which goes back to the NODOS card.
+  LIST   : every node, last heard first: short name, how long ago, hops, distance and direction (when
+           both positions are known). Lost nodes are struck through ("perdido · 2 h"), same rule as
+           CalandriApp: a client after 1 h unheard, a ROUTER / ROUTER_LATE after 13 h (they send their
+           own info every 12 h). The last row opens the Radar (the 10 nearest).
+  CARD   : four boxes (Oído, Enlace, Distancia, Batería) and the actions: Mandarle un mensaje (keyboard /
+           canned, MenuApplet::composeTo), Medir señal, Rastrearlo (the compass of TrackApplet),
+           Marcar / Quitar favorito (NodeDB::set_favorite, no admin packet) and Olvidar nodo (removed
+           from the NodeDB without a reboot, after a second click).
+  RESULT : Medir señal. A traceroute (sent by StatusApplet, one at a time): IDA (us -> node) and VUELTA
+           (node -> us) with the SNR of every hop, the number of hops, how good the link is and its
+           weakest hop. "Midiendo…" while waiting, "Sin respuesta" after the timeout. Click measures again.
+BOOT goes back one level (RESULT -> CARD -> LIST); from the list, InkHudNavigator goes back to Inicio.
 
-The list is rebuilt from NodeDB every NODE_PICKER_REFRESH_MS (default 2 min) while the applet is
-on screen, keeping the cursor on the same node. It only redraws if the list actually changed.
+The list is rebuilt from the NodeDB every NODE_PICKER_REFRESH_MS while on screen, keeping the cursor on
+the same node, and only redrawn when what it shows changed.
 
 */
 
-#include "graphics/niche/InkHUD/Applet.h"
+#include "CalandriaUI.h"
+
 #include "AppletNames.h"
 #include "MenuAppletInclude.h"
+#include "NavReturn.h"
 #include "RadarApplet.h"
 #include "StatusApplet.h"
-#include "graphics/niche/InkHUD/InkHUD.h"
+#include "TrackApplet.h"
 
 #include "NodeDB.h"
 #include "concurrency/OSThread.h"
@@ -34,8 +41,10 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 #ifndef NODE_PICKER_REFRESH_MS
 #define NODE_PICKER_REFRESH_MS (2 * 60 * 1000UL)
 #endif
+#define NODE_PICKER_TRACE_POLL_MS (3 * 1000UL)
 
 #include <algorithm>
+#include <climits>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -43,456 +52,529 @@ on screen, keeping the cursor on the same node. It only redraws if the list actu
 namespace NicheGraphics::InkHUD
 {
 
-class NodePickerApplet : public Applet, public concurrency::OSThread
+class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThread
 {
   public:
     NodePickerApplet() : concurrency::OSThread("NodePickerApplet") { OSThread::disable(); }
 
+    // Entered from Inicio: the list, on the most recently heard node
+    void enter()
+    {
+        rebuild();
+        cursor = 0;
+        top = 0;
+        setLevel(LIST);
+    }
+
     void onActivate() override
     {
-        setGrabbed(false);
+        setLevel(level);
         OSThread::enabled = true;
         OSThread::setIntervalFromNow(NODE_PICKER_REFRESH_MS);
     }
 
     void onDeactivate() override { OSThread::disable(); }
 
-    void onForeground() override
-    {
-        setCard(false);
-        setGrabbed(true);
-        rebuild();
-        cursor = 0;
-        scrollOffset = 0;
-    }
-
     void onRender(bool full) override
     {
         (void)full;
-        setFont(fontSmall);
-        if (nodeDB->getNumMeshNodes() != builtFrom) { // nodes forgotten from the menu ("Limpiar fantasmas")
+        if (nodeDB->getNumMeshNodes() != builtFrom) { // nodes forgotten ("Limpiar fantasmas")
             rebuild();
-            if (card && cursor < nodes.size() && !nodeDB->getMeshNode(nodes[cursor]))
-                setCard(false);
+            if (level != LIST && !nodeDB->getMeshNode(selected))
+                setLevel(LIST);
         }
-        if (card && cursor < nodes.size()) {
-            renderCard(nodes[cursor]);
-            return;
-        }
-        drawHeader(headerText());
-
-        const int16_t top = getHeaderHeight() + 2;
-        if (nodes.empty()) {
-            printAt(X(0.5f), Y(0.5f), "No nodes yet", CENTER, MIDDLE);
-            return;
-        }
-
-        const uint16_t rowH = fontSmall.lineHeight() + 2;
-        uint16_t rows = (height() - top) / rowH;
-        if (rows < 1)
-            rows = 1;
-
-        // Keep the cursor on screen
-        if (cursor < scrollOffset)
-            scrollOffset = cursor;
-        if (cursor >= scrollOffset + rows)
-            scrollOffset = cursor - rows + 1;
-
-        for (uint16_t r = 0; r < rows && (scrollOffset + r) < nodes.size(); r++) {
-            const uint16_t idx = scrollOffset + r;
-            const int16_t y = top + r * rowH;
-            const bool sel = grabbed && idx == cursor;
-            if (sel)
-                drawSelection(y, rowH);
-            setTextColor(BLACK);
-            // Right column: hops ("d" = heard directly, "2s" = 2 hops) + how long ago
-            std::string age = ageFor(nodes[idx]);
-            const std::string hops = hopsFor(nodes[idx]);
-            if (!hops.empty())
-                age = age.empty() ? hops : hops + " " + age;
-            const uint16_t ageW = age.empty() ? 0 : getTextWidth(age) + 4;
-            setCrop(0, y, width() - ageW, rowH); // long names never run into the age column
-            printAt(2, y + 1, labelFor(nodes[idx]));
-            resetCrop();
-            if (!age.empty())
-                printAt(width() - 2, y + 1, age, RIGHT, TOP);
-
-            // Dotted line under the last "active" node (heard within the menu's Recents window):
-            // replaces the separate Heard / Recents List applets
-            if (idx + 1 < nodes.size() && isActive(nodes[idx]) && !isActive(nodes[idx + 1]))
-                for (int16_t x = 0; x < width(); x += 3)
-                    drawPixel(x, y + rowH - 1, BLACK);
-        }
-
-        drawScrollHints(scrollOffset > 0, (scrollOffset + rows) < nodes.size());
+        if (level == CARD)
+            renderCard();
+        else if (level == RESULT)
+            renderResult();
+        else
+            renderList();
     }
 
     void onButtonShortPress() override
     {
-        if (card) {
-            runAction();
-        } else if (grabbed && cursor < nodes.size()) {
-            setCard(true);
+        if (level == LIST) {
+            if (cursor == nodes.size()) { // the Radar row
+                openRadar();
+                return;
+            }
+            if (cursor > nodes.size())
+                return;
+            selected = nodes[cursor];
             action = 0;
             notice.clear();
-            requestUpdate(EInk::UpdateTypes::FULL); // whole screen changes
-        } else if (!grabbed) {
-            setGrabbed(true);
-            requestUpdate(EInk::UpdateTypes::FAST);
+            setLevel(CARD);
+            requestUpdate(EInk::UpdateTypes::FULL);
+        } else if (level == CARD) {
+            runAction();
+        } else {
+            measure(); // again
         }
     }
 
-    void onButtonLongPress() override { back(); }
-    void onExitShort() override { back(); }
-
-    void onNavUp() override
+    // CARD / RESULT only (subscribed there)
+    void onButtonLongPress() override { onExitShort(); }
+    void onExitShort() override
     {
-        if (card) {
-            moveAction(-1);
-            return;
-        }
-        if (cursor > 0) {
-            cursor--;
-            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
-        }
+        notice.clear();
+        setLevel(level == RESULT ? CARD : LIST);
+        requestUpdate(EInk::UpdateTypes::FULL);
     }
 
-    void onNavDown() override
-    {
-        if (card) {
-            moveAction(1);
-            return;
-        }
-        if (cursor + 1 < nodes.size()) {
-            cursor++;
-            requestUpdate(navUpdateType()); // full render: clear the tile first (false = draw over the old frame)
-        }
-    }
+    void onNavUp() override { move(-1); }
+    void onNavDown() override { move(1); }
 
   protected:
-    // Periodic refresh. Only while on screen: onForeground() rebuilds anyway when we come back.
     int32_t runOnce() override
     {
-        if (isForeground() && card) {
-            requestUpdate(EInk::UpdateTypes::FAST); // card: refresh "heard N ago" (nodes are not re-sorted)
-        } else if (isForeground()) {
-            const NodeNum selected = cursor < nodes.size() ? nodes[cursor] : 0;
+        if (!isForeground())
+            return NODE_PICKER_REFRESH_MS;
+        if (level == RESULT) { // waiting for the traceroute
+            StatusApplet *st = status();
+            const uint8_t state = st ? (uint8_t)st->traceStateFor(selected) : (uint8_t)0;
+            if (state != shownTraceState)
+                requestUpdate(EInk::UpdateTypes::FAST);
+            return state == StatusApplet::TRACE_PENDING ? NODE_PICKER_TRACE_POLL_MS : NODE_PICKER_REFRESH_MS;
+        }
+        if (level == CARD) {
+            requestUpdate(EInk::UpdateTypes::FAST); // "hace N" changes
+        } else {
+            const NodeNum keep = cursor < nodes.size() ? nodes[cursor] : 0;
             const std::string before = signature();
             rebuild();
             for (uint16_t i = 0; i < nodes.size(); i++)
-                if (nodes[i] == selected)
-                    cursor = i; // keep the highlight on the same node
+                if (nodes[i] == keep)
+                    cursor = i; // keep the selection on the same node
             if (signature() != before)
-                requestUpdate(EInk::UpdateTypes::FAST); // e-paper: redraw only on a visible change
+                requestUpdate(EInk::UpdateTypes::FAST);
         }
         return NODE_PICKER_REFRESH_MS;
     }
 
   private:
+    enum Level : uint8_t { LIST, CARD, RESULT };
+    static constexpr uint8_t ACTIONS = 5;
+    static constexpr const char *CONFIRM_FORGET = "Clic de nuevo: olvidar";
 
-    // E-paper: a black highlight bar, inverted on every step, ghosts badly with partial refreshes.
-    // Use a double outline instead, and do a FULL refresh when the move scrolls to a new page
-    // (every row changes); moves inside the page stay FAST.
-    void drawSelection(int16_t y, uint16_t rowH)
-    {
-        drawRect(0, y, width(), rowH, BLACK);
-        drawRect(1, y + 1, width() - 2, rowH - 2, BLACK);
-    }
-
-    uint16_t listRows()
-    {
-        const int16_t top = getHeaderHeight() + 2;
-        const uint16_t rowH = fontSmall.lineHeight() + 2;
-        const uint16_t rows = (height() - top) / rowH;
-        return rows ? rows : 1;
-    }
-
-    EInk::UpdateTypes navUpdateType()
-    {
-        const bool pageTurn = cursor < scrollOffset || cursor >= scrollOffset + listRows();
-        return pageTurn ? EInk::UpdateTypes::FULL : EInk::UpdateTypes::FAST;
-    }
+    Level level = LIST;
     std::vector<NodeNum> nodes;
-    uint16_t cursor = 0;
-    uint16_t scrollOffset = 0;
-    bool grabbed = false;
+    uint16_t cursor = 0, top = 0; // cursor == nodes.size(): the Radar row
+    NodeNum selected = 0;
+    uint8_t action = 0;
+    std::string notice;
+    size_t builtFrom = 0;
+    uint8_t shownTraceState = 0;
 
-    // Short-press is always ours (open card / run action), nav while on screen. Long-press and EXIT
-    // only on the card: from the list they belong to InkHudNavigator (back to the NODOS card).
-    void setGrabbed(bool g)
+    void setLevel(Level l)
     {
-        grabbed = g;
+        level = l;
         setInputsSubscribed(BUTTON_SHORT, true);
-        setInputsSubscribed(NAV_UP | NAV_DOWN, g);
-        setInputsSubscribed(BUTTON_LONG | EXIT_SHORT, g && card);
+        setInputsSubscribed(NAV_UP | NAV_DOWN, l != RESULT);
+        setInputsSubscribed(BUTTON_LONG | EXIT_SHORT, l != LIST);
+        if (l == RESULT)
+            OSThread::setIntervalFromNow(NODE_PICKER_TRACE_POLL_MS);
     }
 
-    void setCard(bool c)
+    void move(int dir)
     {
-        card = c;
-        setGrabbed(grabbed);
+        if (level == CARD) {
+            const int next = (int)action + dir;
+            if (next < 0 || next >= ACTIONS)
+                return;
+            action = (uint8_t)next;
+            notice.clear();
+        } else {
+            const int next = (int)cursor + dir;
+            if (next < 0 || next > (int)nodes.size()) // nodes + the Radar row
+                return;
+            cursor = (uint16_t)next;
+        }
+        requestUpdate(EInk::UpdateTypes::FAST);
     }
 
-    // ---------- Node card ----------
-    bool card = false;   // showing the selected node's card instead of the list
-    uint8_t action = 0;  // 0 = DM, 1 = traceroute, 2 = radar, 3 = forget
-    std::string notice;  // one-line feedback on the card ("espera 20s")
-    static constexpr uint8_t ACTIONS = 4;
-    size_t builtFrom = 0; // NodeDB size the list was built from
-
-    // Card -> list (from the list, BOOT is the navigator's)
-    void back()
+    // ---------- Data ----------
+    void rebuild()
     {
-        if (!card)
-            return;
-        setCard(false);
-        requestUpdate(EInk::UpdateTypes::FULL);
+        nodes.clear();
+        const NodeNum me = nodeDB->getNodeNum();
+        builtFrom = nodeDB->getNumMeshNodes();
+        for (uint32_t i = 0; i < builtFrom; i++) {
+            const meshtastic_NodeInfoLite *n = nodeDB->getMeshNodeByIndex(i);
+            if (n && n->num != me)
+                nodes.push_back(n->num);
+        }
+        // Most recently heard first; never heard (last_heard 0) at the end
+        std::stable_sort(nodes.begin(), nodes.end(), [](NodeNum a, NodeNum b) {
+            const meshtastic_NodeInfoLite *na = nodeDB->getMeshNode(a), *nb = nodeDB->getMeshNode(b);
+            return (na ? na->last_heard : 0) > (nb ? nb->last_heard : 0);
+        });
+        if (cursor > nodes.size())
+            cursor = nodes.size();
     }
 
-    void moveAction(int dir)
+    static uint32_t heardAgo(const meshtastic_NodeInfoLite *n) { return n && n->last_heard ? sinceLastSeen(n) : UINT32_MAX; }
+
+    // CalandriApp's rule: 1 h for a client, 13 h for a router (they announce themselves every 12 h)
+    static bool isLost(const meshtastic_NodeInfoLite *n)
     {
-        action = (uint8_t)((action + ACTIONS + dir) % ACTIONS); // wraps around
-        notice.clear();
-        requestUpdate(EInk::UpdateTypes::FAST); // full render: clear the tile first (false = draw over the old frame)
+        const uint32_t s = heardAgo(n);
+        if (s == UINT32_MAX)
+            return true;
+        const bool router =
+            n->role == meshtastic_Config_DeviceConfig_Role_ROUTER || n->role == meshtastic_Config_DeviceConfig_Role_ROUTER_LATE;
+        return s > (router ? 13UL : 1UL) * 3600UL;
     }
 
-    // Our own applets, found by the name they are registered under (no RTTI)
+    std::string hopsShort(const meshtastic_NodeInfoLite *n)
+    {
+        if (!n || !n->has_hops_away)
+            return "";
+        return n->hops_away == 0 ? std::string("d") : fmt("%us", (unsigned)n->hops_away);
+    }
+
+    std::string hopsLong(const meshtastic_NodeInfoLite *n)
+    {
+        if (!n || !n->has_hops_away)
+            return "?";
+        return n->hops_away == 0 ? std::string("directo") : fmt("%u salto%s", (unsigned)n->hops_away, n->hops_away == 1 ? "" : "s");
+    }
+
+    std::string whereTo(NodeNum num)
+    {
+        float meters, bearing;
+        if (!RadarApplet::locate(num, &meters, &bearing))
+            return "";
+        return localizeDistance((uint32_t)meters) + " " + cardinal(bearingDegrees(bearing));
+    }
+
+    std::string signature()
+    {
+        std::string s;
+        for (NodeNum n : nodes) {
+            const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(n);
+            const uint32_t a = heardAgo(node);
+            s += std::to_string(n) + (a == UINT32_MAX ? std::string("-") : ago(a)) + hopsShort(node) + whereTo(n) + ";";
+        }
+        return s;
+    }
+
+    StatusApplet *status() { return findApplet<StatusApplet>(AppletNames::STATUS, nullptr); }
+
     template <class T> T *findApplet(const char *name, uint8_t *index)
     {
         for (size_t i = 0; i < inkhud->userApplets.size(); i++) {
             Applet *a = inkhud->userApplets[i];
             if (a && a->name && strcmp(a->name, name) == 0) {
-                *index = (uint8_t)i;
+                if (index)
+                    *index = (uint8_t)i;
                 return static_cast<T *>(a);
             }
         }
         return nullptr;
     }
 
-    void showRadar(NodeNum num)
+    // Show another applet; BOOT there comes back here, as we were
+    template <class T> T *openChild(const char *name)
     {
-        float meters, bearing;
         uint8_t index = 0;
-        RadarApplet *radar = findApplet<RadarApplet>(AppletNames::RADAR, &index);
-        if (!RadarApplet::haveOwnPosition())
-            notice = "Sin GPS propio";
-        else if (!RadarApplet::locate(num, &meters, &bearing))
-            notice = "Sin posición conocida";
-        else if (!radar)
-            notice = "Sin applet Radar";
-        else if (!radar->isActive())
-            notice = "Activá Radar en el menú";
-        else {
-            radar->setTarget(num);
-            setCard(false);
-            setGrabbed(false);
-            inkhud->showApplet(index);
+        T *a = findApplet<T>(name, &index);
+        if (!a)
+            return nullptr;
+        if (!a->isActive()) {
+            settings->userApplets.active[index] = true;
+            a->activate();
+        }
+        NavReturn::set(a, this);
+        inkhud->showApplet(index);
+        return a;
+    }
+
+    void openRadar()
+    {
+        RadarApplet *radar = findApplet<RadarApplet>(AppletNames::RADAR, nullptr);
+        if (radar)
+            radar->setTarget(0); // the nearest
+        openChild<RadarApplet>(AppletNames::RADAR);
+    }
+
+    // ---------- Actions ----------
+    void runAction()
+    {
+        const meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(selected);
+        if (!n) {
+            setLevel(LIST);
+            requestUpdate(EInk::UpdateTypes::FULL);
+            return;
+        }
+        switch (action) {
+        case 0: { // message: canned or keyboard, straight to this node
+            const ChannelIndex channel = nodeDB->getMeshNodeChannel(selected);
+            inkhud->openMenu();
+            MenuApplet *menu = (MenuApplet *)inkhud->getSystemApplet("Menu");
+            if (menu)
+                menu->composeTo(selected, channel);
+            return;
+        }
+        case 1:
+            measure();
+            return;
+        case 2: {
+            float m, b;
+            if (!RadarApplet::haveOwnPosition())
+                notice = "Sin posición propia";
+            else if (!RadarApplet::locate(selected, &m, &b))
+                notice = "Ese nodo no tiene posición";
+            else if (TrackApplet *t = findApplet<TrackApplet>(AppletNames::TRACK, nullptr)) {
+                t->track(selected);
+                openChild<TrackApplet>(AppletNames::TRACK);
+                return;
+            }
+            break;
+        }
+        case 3: {
+            const bool fav = nodeInfoLiteIsFavorite(n);
+            if (nodeDB->set_favorite(!fav, selected))
+                notice = fav ? "Quitado de favoritos" : "Marcado como favorito";
+            else
+                notice = "No se pudo: límite de favoritos";
+            break;
+        }
+        default:
+            if (notice != CONFIRM_FORGET) {
+                notice = CONFIRM_FORGET;
+                break;
+            }
+            nodeDB->removeNodeByNum(selected);
+            notice.clear();
+            rebuild();
+            setLevel(LIST);
+            requestUpdate(EInk::UpdateTypes::FULL);
             return;
         }
         requestUpdate(EInk::UpdateTypes::FAST);
     }
 
-    // Forget a node (a ghost, a duplicate): removed from the NodeDB, no reboot. If it transmits
-    // again it comes back on its own. Second press confirms.
-    void forget(NodeNum num)
+    void measure()
     {
-        if (notice != CONFIRM_FORGET) {
-            notice = CONFIRM_FORGET;
-            requestUpdate(EInk::UpdateTypes::FAST);
-            return;
-        }
-        nodeDB->removeNodeByNum(num);
-        setCard(false);
-        notice.clear();
-        rebuild();
-        requestUpdate(EInk::UpdateTypes::FULL);
-    }
-    static constexpr const char *CONFIRM_FORGET = "Pulsá de nuevo: olvidar";
-
-    void runAction()
-    {
-        if (cursor >= nodes.size())
-            return;
-        if (action == 0) {
-            setCard(false);
-            compose();
-            return;
-        }
-        if (action == 2) {
-            showRadar(nodes[cursor]);
-            return;
-        }
-        if (action == 3) {
-            forget(nodes[cursor]);
-            return;
-        }
-        uint8_t index = 0;
-        StatusApplet *st = findApplet<StatusApplet>(AppletNames::STATUS, &index);
+        StatusApplet *st = status();
         if (!st) {
             notice = "Sin applet Estado";
         } else if (const uint32_t wait = st->traceWaitSeconds()) {
-            notice = "Espera " + std::to_string(wait) + "s";
-        } else if (st->traceTo(nodes[cursor])) {
-            if (st->isActive()) {
-                setCard(false);
-                setGrabbed(false);
-                inkhud->showApplet(index); // the result appears there
-                return;
-            }
-            notice = "Enviado: ver en Estado"; // Estado hidden from the menu: stay on the card
+            notice = fmt("Esperá %lus", (unsigned long)wait); // one at a time, with a cooldown
+        } else if (st->traceTo(selected)) {
+            notice.clear();
+            setLevel(RESULT);
+            requestUpdate(EInk::UpdateTypes::FULL);
+            return;
         } else {
             notice = "No se pudo enviar";
         }
-        requestUpdate(EInk::UpdateTypes::FAST); // full render: clear the tile first (false = draw over the old frame)
+        requestUpdate(EInk::UpdateTypes::FAST);
     }
 
-    void renderCard(NodeNum num)
+    // ---------- Drawing ----------
+    void renderList()
     {
-        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
-        std::string title = labelFor(num);
-        drawHeader(title);
-        const uint16_t lineH = fontSmall.lineHeight() + 2;
-        int16_t y = getHeaderHeight() + 3;
+        drawBar("NODOS", fmt("%u", (unsigned)nodes.size()), true);
+        setFont(fontSmall);
+        const int16_t y0 = barHeight() + 1;
+        const uint16_t rowH = fontSmall.lineHeight() + 5;
+        const uint16_t rows = std::max<uint16_t>(1, (height() - y0) / rowH);
+        const uint16_t total = nodes.size() + 1; // + Radar
+        if (cursor < top)
+            top = cursor;
+        if (cursor >= top + rows)
+            top = cursor - rows + 1;
 
-        std::string l1 = "Saltos: ";
-        if (!node || !node->has_hops_away)
-            l1 += "?";
-        else if (node->hops_away == 0)
-            l1 += "directo";
-        else
-            l1 += std::to_string(node->hops_away);
-        printAt(2, y, l1);
-        y += lineH;
-        if (node && node->has_hops_away && node->hops_away == 0) {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "Lo oímos %.1f dB", node->snr);
-            printAt(2, y, parse(buf));
-            y += lineH;
+        for (uint16_t r = 0; r < rows && top + r < total; r++) {
+            const uint16_t i = top + r;
+            const int16_t y = y0 + r * rowH;
+            const uint16_t fg = beginRow(y, rowH, i == cursor);
+            const int16_t mid = y + rowH / 2;
+            if (i == nodes.size()) {
+                printAt(6, mid, parse("Radar: los 10 más cerca"), LEFT, MIDDLE);
+                drawChevron(width() - 9, mid, fg);
+                setTextColor(BLACK);
+                continue;
+            }
+            const meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(nodes[i]);
+            const bool lost = isLost(n);
+            const uint32_t a = heardAgo(n);
+
+            // Right: distance + direction, hops
+            std::string right = whereTo(nodes[i]);
+            const std::string hops = hopsShort(n);
+            if (!hops.empty())
+                right += (right.empty() ? "" : "  ") + hops;
+            uint16_t rightW = 0;
+            if (!right.empty()) {
+                printAt(width() - 3, mid, right, RIGHT, MIDDLE);
+                rightW = getTextWidth(right) + 6;
+            }
+
+            // Left: short name (faux bold), then how long ago
+            const std::string name = shortNameOf(nodes[i]);
+            setCrop(0, y, width() - rightW, rowH);
+            printAt(4, mid, name, LEFT, MIDDLE);
+            printAt(5, mid, name, LEFT, MIDDLE);
+            const std::string when = parse(a == UINT32_MAX ? std::string("nunca") : lost ? "perdido · " + ago(a) : ago(a));
+            printAt(42, mid, when, LEFT, MIDDLE);
+            resetCrop();
+            if (lost) // struck through
+                drawLine(3, mid, std::min<int16_t>(width() - rightW, 42 + getTextWidth(when)) + 1, mid, fg);
+            setTextColor(BLACK);
         }
-        const std::string age = ageFor(num);
-        printAt(2, y, age.empty() ? std::string("Nunca escuchado") : "Escuchado hace " + age);
-        y += lineH;
-        std::string id = hexifyNodeNum(num);
-        if (node && nodeInfoLiteHasUser(node) && node->short_name[0])
-            id = parseShortName((meshtastic_NodeInfoLite *)node) + "   " + id; // what Heard showed big
-        printAt(2, y, id);
-        y += lineH;
-        float meters, bearing;
-        if (RadarApplet::locate(num, &meters, &bearing))
-            printAt(2, y, "A " + localizeDistance((uint32_t)meters) + " al " + RadarApplet::cardinal(bearing));
-        else
-            printAt(2, y, parse(RadarApplet::haveOwnPosition() ? "Sin posición conocida" : "Distancia: sin GPS propio"));
-        y += lineH + 4;
+        drawScrollHints(top > 0, top + rows < total);
+    }
 
-        const char *labels[ACTIONS] = {"Mensaje directo", "Medir señal", "Radar", "Olvidar nodo"};
-        const uint16_t rowH = lineH + 2;
+    void renderCard()
+    {
+        const meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(selected);
+        drawBar(longNameOf(selected), shortNameOf(selected), true);
+
+        const int16_t y0 = barHeight() + 3;
+        const uint16_t gap = 3;
+        const uint16_t bw = (width() - 3 * gap) / 2;
+        const uint16_t bh = fontSmall.lineHeight() + fontMedium.lineHeight() + 6;
+        const int16_t x0 = gap, x1 = 2 * gap + bw, y1 = y0 + bh + gap;
+
+        const uint32_t a = heardAgo(n);
+        drawBox(x0, y0, bw, bh, parse("Oído"),
+                a == UINT32_MAX ? std::string("nunca") : parse(a < 60 ? std::string("recién") : "hace " + ago(a)), "");
+        std::string link = hopsLong(n);
+        if (n && n->has_hops_away && n->hops_away == 0)
+            link += fmt(" %.0fdB", n->snr);
+        drawBox(x1, y0, bw, bh, "Enlace", link, "");
+        const std::string where = whereTo(selected);
+        drawBox(x0, y1, bw, bh, "Distancia", where.empty() ? std::string("--") : where, "");
+        meshtastic_DeviceMetrics dm = meshtastic_DeviceMetrics_init_zero;
+        std::string bat = "--";
+        if (nodeDB->copyNodeTelemetry(selected, dm) && dm.has_battery_level)
+            bat = dm.battery_level > 100 ? std::string("enchufado") : fmt("%lu%%", (unsigned long)dm.battery_level);
+        drawBox(x1, y1, bw, bh, parse("Batería"), bat, "");
+
+        const bool fav = n && nodeInfoLiteIsFavorite(n);
+        const char *labels[ACTIONS] = {"Mandarle un mensaje", "Medir señal", "Rastrearlo (brújula)",
+                                       fav ? "Quitar favorito" : "Marcar favorito", "Olvidar nodo"};
+        setFont(fontSmall);
+        const uint16_t rowH = fontSmall.lineHeight() + 5;
+        int16_t y = y1 + bh + gap + 1;
         for (uint8_t i = 0; i < ACTIONS; i++) {
-            if (i == action)
-                drawSelection(y, rowH);
-            printAt(6, y + 2, parse(labels[i]));
-            y += rowH + 2;
+            const uint16_t fg = beginRow(y, rowH, i == action);
+            printAt(6, y + rowH / 2, parse(labels[i]), LEFT, MIDDLE);
+            if (i == 2)
+                drawChevron(width() - 9, y + rowH / 2, fg);
+            setTextColor(BLACK);
+            y += rowH;
         }
         if (!notice.empty())
-            printAt(2, y + 2, parse(notice));
+            printAt(4, height() - 2, parse(notice), LEFT, BOTTOM);
     }
 
-    void rebuild()
+    // ---------- Medir señal ----------
+    struct Hop {
+        NodeNum from, to;
+        int8_t snrQ4; // INT8_MIN = unknown
+    };
+
+    // The hops of one direction. towards: us -> route[] -> target, SNR as heard by the receiving end.
+    // back: target -> route_back[] -> us; our own SNR may be missing (we are the last hop): use rxSnr.
+    std::vector<Hop> hops(bool towards)
     {
-        nodes.clear();
+        StatusApplet *st = status();
+        const meshtastic_RouteDiscovery &r = st->lastRoute();
+        std::vector<NodeNum> path;
         const NodeNum me = nodeDB->getNodeNum();
-        const uint32_t count = nodeDB->getNumMeshNodes();
-        builtFrom = count;
-        for (uint32_t i = 0; i < count; i++) {
-            meshtastic_NodeInfoLite *node = nodeDB->getMeshNodeByIndex(i);
-            if (!node || node->num == me)
-                continue;
-            nodes.push_back(node->num);
+        path.push_back(towards ? me : selected);
+        const uint32_t *mid = towards ? r.route : r.route_back;
+        const pb_size_t count = towards ? r.route_count : r.route_back_count;
+        for (pb_size_t i = 0; i < count; i++)
+            path.push_back(mid[i]);
+        path.push_back(towards ? selected : me);
+        const int8_t *snr = towards ? r.snr_towards : r.snr_back;
+        const pb_size_t snrCount = towards ? r.snr_towards_count : r.snr_back_count;
+        std::vector<Hop> out;
+        for (size_t i = 0; i + 1 < path.size(); i++) {
+            int8_t q = i < snrCount ? snr[i] : INT8_MIN;
+            if (!towards && i + 2 == path.size() && i >= snrCount)
+                q = (int8_t)std::clamp<long>(lroundf(st->lastRxSnr() * 4), -127, 127);
+            out.push_back({path[i], path[i + 1], q});
         }
-        // Most recently heard first; never-heard (last_heard 0) at the end
-        std::stable_sort(nodes.begin(), nodes.end(), [](NodeNum a, NodeNum b) {
-            const meshtastic_NodeInfoLite *na = nodeDB->getMeshNode(a), *nb = nodeDB->getMeshNode(b);
-            return (na ? na->last_heard : 0) > (nb ? nb->last_heard : 0);
-        });
-        if (cursor >= nodes.size())
-            cursor = nodes.empty() ? 0 : (uint16_t)(nodes.size() - 1);
+        return out;
     }
 
-    // Coarse "heard N ago": minutes < 1h, hours < 1 day, then days. Coarse on purpose, so the
-    // 2-minute refresh only repaints the panel when a label actually changes.
-    std::string ageFor(NodeNum num)
+    std::string snrText(int8_t q) { return q == INT8_MIN ? std::string("?") : fmt("%+.0f dB", q / 4.0f); }
+
+    // "VOS -3 dB » BASE -8 dB » JUAN"
+    std::string chain(const std::vector<Hop> &h)
     {
-        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
-        if (!node || !node->last_heard)
-            return "";
-        const uint32_t s = sinceLastSeen(node);
-        char buf[8];
-        if (s < 3600)
-            snprintf(buf, sizeof(buf), "%um", (unsigned)(s / 60));
-        else if (s < 86400)
-            snprintf(buf, sizeof(buf), "%uh", (unsigned)(s / 3600));
-        else
-            snprintf(buf, sizeof(buf), "%ud", (unsigned)(s / 86400));
-        return buf;
+        std::string s;
+        for (const Hop &x : h)
+            s += shortNameOf(x.from) + " " + snrText(x.snrQ4) + " » ";
+        if (!h.empty())
+            s += shortNameOf(h.back().to);
+        return s;
     }
 
-    // What the screen shows (order + ages): redraw only when this changes
-    std::string signature()
-    {
-        std::string sig;
-        for (NodeNum n : nodes)
-            sig += std::to_string(n) + ageFor(n) + hopsFor(n) + (isActive(n) ? "a" : "") + ";";
-        return sig;
-    }
+    static const char *quality(float worstDb) { return worstDb >= -5 ? "bueno" : worstDb >= -12 ? "justo" : "flojo"; }
 
-    // Same "active" notion as the stock Recents List: heard within settings->recentlyActiveSeconds
-    // (set from the menu). Shown as a count in the header and a divider in the list.
-    bool isActive(NodeNum num)
+    void renderResult()
     {
-        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
-        return node && node->last_heard && sinceLastSeen(node) <= settings->recentlyActiveSeconds;
-    }
-
-    std::string headerText()
-    {
-        uint16_t active = 0;
-        for (NodeNum n : nodes)
-            if (isActive(n))
-                active++;
-        char buf[32];
-        snprintf(buf, sizeof(buf), "Nodes %u (%u act)", (unsigned)nodes.size(), (unsigned)active);
-        return buf;
-    }
-
-    std::string hopsFor(NodeNum num)
-    {
-        const meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
-        if (!node || !node->has_hops_away)
-            return "";
-        if (node->hops_away == 0)
-            return "d";
-        char buf[6];
-        snprintf(buf, sizeof(buf), "%us", (unsigned)node->hops_away);
-        return buf;
-    }
-
-    std::string labelFor(NodeNum num)
-    {
-        meshtastic_NodeInfoLite *node = nodeDB->getMeshNode(num);
-        if (node && nodeInfoLiteHasUser(node) && node->long_name[0])
-            return parse(node->long_name);
-        return hexifyNodeNum(num);
-    }
-
-    void compose()
-    {
-        if (cursor >= nodes.size())
+        StatusApplet *st = status();
+        drawBar(parse("MEDIR SEÑAL"), shortNameOf(selected), true);
+        setFont(fontSmall);
+        const uint8_t state = st ? (uint8_t)st->traceStateFor(selected) : (uint8_t)StatusApplet::TRACE_FAILED;
+        shownTraceState = state;
+        if (state == StatusApplet::TRACE_PENDING) {
+            setFont(fontMedium);
+            printAt(X(0.5f), Y(0.45f), parse("Midiendo…"), CENTER, MIDDLE);
+            setFont(fontSmall);
+            printAt(X(0.5f), Y(0.45f) + fontMedium.lineHeight(), "puede tardar hasta 90 s", CENTER, MIDDLE);
             return;
-        const NodeNum dest = nodes[cursor];
-        const ChannelIndex channel = nodeDB->getMeshNodeChannel(dest);
-        inkhud->openMenu(); // borrow this tile, bring the menu forward
-        MenuApplet *menu = (MenuApplet *)inkhud->getSystemApplet("Menu");
-        if (menu)
-            menu->composeTo(dest, channel);
+        }
+        if (state != StatusApplet::TRACE_DONE) {
+            setFont(fontMedium);
+            printAt(X(0.5f), Y(0.45f), "Sin respuesta", CENTER, MIDDLE);
+            setFont(fontSmall);
+            printAt(X(0.5f), Y(0.45f) + fontMedium.lineHeight(), parse(notice.empty() ? std::string("Clic: medir de nuevo") : notice),
+                    CENTER, MIDDLE);
+            return;
+        }
+
+        const std::vector<Hop> out = hops(true), back = hops(false);
+        int16_t y = barHeight() + 4;
+        const uint16_t lh = fontSmall.lineHeight() + 2;
+        auto section = [&](const char *title, const std::vector<Hop> &h) {
+            printAt(4, y, title);
+            printAt(5, y, title); // faux bold
+            y += lh;
+            const std::string c = parse(chain(h));
+            printWrapped(8, y, width() - 12, c);
+            y += getWrappedTextHeight(8, width() - 12, c) + 4;
+        };
+        section("IDA", out);
+        section("VUELTA", back);
+        dottedLine(y);
+        y += 4;
+
+        // Summary: hops, how good, and the weakest hop of either direction
+        Hop worst = {0, 0, INT8_MIN};
+        for (const std::vector<Hop> *dir : {&out, &back})
+            for (const Hop &h : *dir)
+                if (h.snrQ4 != INT8_MIN && (worst.snrQ4 == INT8_MIN || h.snrQ4 < worst.snrQ4))
+                    worst = h;
+        const unsigned count = out.size();
+        std::string summary = fmt("%u salto%s", count, count == 1 ? "" : "s");
+        if (worst.snrQ4 != INT8_MIN)
+            summary += std::string(" · enlace ") + quality(worst.snrQ4 / 4.0f);
+        setFont(fontMedium);
+        printAt(4, y, parse(summary));
+        y += fontMedium.lineHeight() + 3;
+        setFont(fontSmall);
+        if (worst.snrQ4 != INT8_MIN && (out.size() + back.size()) > 2)
+            printWrapped(4, y, width() - 8,
+                         parse("Más flojo: " + shortNameOf(worst.from) + " » " + shortNameOf(worst.to) + " " + snrText(worst.snrQ4)));
+        printAt(4, height() - 2, parse(notice.empty() ? std::string("Clic: medir de nuevo") : notice), LEFT, BOTTOM);
     }
 };
 

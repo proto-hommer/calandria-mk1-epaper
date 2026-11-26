@@ -21,6 +21,7 @@
 #include "graphics/niche/Utils/FlashData.h"
 
 #include "AppletNames.h"
+#include "ConversationApplet.h"
 #include "DeliveryWatcher.h"
 #include "EncoderInput.h"
 #include "HubApplet.h"
@@ -28,6 +29,7 @@
 #include "RadarApplet.h"
 #include "StatusApplet.h"
 #include "TimezoneWatcher.h"
+#include "TrackApplet.h"
 #include "WaypointCompassApplet.h"
 
 #include "NodeDB.h"
@@ -172,6 +174,8 @@ void setupNicheGraphics()
     inkhud->addApplet(AppletNames::POSITIONS, new InkHUD::PositionsApplet, true); // index 10: map of all nodes
     inkhud->addApplet(AppletNames::STATUS, new InkHUD::StatusApplet, true);       // index 11: sensors / battery / radio / GPS
     inkhud->addApplet(AppletNames::HOME, new InkHUD::HubApplet, true);            // index 12: Inicio, the 4 cards
+    inkhud->addApplet(AppletNames::CONVERSATIONS, new InkHUD::ConversationApplet, true); // 13: MENSAJES
+    inkhud->addApplet(AppletNames::TRACK, new InkHUD::TrackApplet, true);                 // 14: RUMBO compass / position
 
     // Physical CardKB (I2C 0x5F, on the touch connector's SDA/SCL), like the Wio Tracker L1.
     // Found by the boot I2C scan; with it attached the on-screen keyboard is never shown.
