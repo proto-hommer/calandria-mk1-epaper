@@ -12,8 +12,8 @@
 
 Variante propia de Meshtastic para la **Waveshare ESP32-S3-ePaper-1.54** (V2, sin touch) con un
 módulo LoRa **Seeed Wio-SX1262 for XIAO** cableado a mano. Usa InkHUD en el e-paper de 1,54" y
-suma un encoder rotativo EC11 opcional, con interfaz propia: lista de nodos, mensajes directos,
-respuestas, teclado en pantalla, brújula de waypoints, radar de nodos cercanos y pantalla de estado.
+suma un encoder rotativo EC11, con interfaz propia: un Inicio con cuatro carátulas (mensajes, nodos,
+rumbo y estado), conversaciones, medición de señal, brújulas, radar de nodos cercanos y WiFi.
 
 > Es un build comunitario no oficial, sin soporte de Meshtastic ni de Waveshare.
 >
@@ -31,7 +31,7 @@ respuestas, teclado en pantalla, brújula de waypoints, radar de nodos cercanos 
 | Antena LoRa para tu región | **Conectala siempre antes de energizar.** Transmitir sin antena puede dañar el SX1262 |
 | Cable fino (sirve el esmaltado) | Para cablear la radio |
 | Batería LiPo (opcional) | En el conector de batería de la placa |
-| Encoder rotativo EC11 con pulsador (opcional) | 20 pasos por vuelta |
+| Encoder rotativo EC11 con pulsador | 20 pasos por vuelta |
 
 La ranura microSD **no se usa**: sus pads llevan las señales de la radio. Dejala vacía. El codec de
 audio ES8311 tampoco se usa. Para el encoder, desoldá el codec y cableá el encoder a tres de los
@@ -57,7 +57,7 @@ Esquemático de la placa: [wiki de Waveshare](https://www.waveshare.com/wiki/ESP
 
 Para ubicar cada señal en el módulo, mirá el pinout del Wio-SX1262 que publica Seeed.
 
-### Encoder rotativo (opcional)
+### Encoder rotativo
 
 | Pata del encoder | GPIO | Pad del ES8311 (codec retirado) |
 |---|---|---|
@@ -66,6 +66,7 @@ Para ubicar cada señal en el módulo, mirá el pinout del Wio-SX1262 que public
 | Pulsador | 14 | 2 (I2S_MCLK) |
 | Común + segunda pata del pulsador | GND | — |
 
+Hace falta para moverse por el Inicio y las carátulas: solo con BOOT se llega al menú de InkHUD.
 Se usan los pull-ups internos, así que no hacen falta resistencias. Si el giro va al revés,
 intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` en `variant.h`.
 
@@ -91,19 +92,19 @@ Los primeros releases usaban otro esquema. Sus tags quedan como están:
 | `v2.8.3-ws154.4` | 0.4.0 |
 | `v2.8.3-ws154.5` | 0.5.0 |
 
-El nodo muestra su versión en *Estado*. Con CalandriApp conectada (1.8.5 o posterior), *Estado*
-también muestra "Firmware nuevo: X.Y.Z" cuando hay un release más nuevo (el nodo no tiene
-internet: se lo dice la app), y la hora pasa a la zona horaria del celular enseguida, sin reiniciar.
+El nodo muestra su versión en *ESTADO → Firmware*. Con CalandriApp conectada (1.8.5 o posterior)
+dice "al día", "hay X.Y.Z" cuando hay un release más nuevo (se lo dice la app) o "de prueba" si el
+nodo tiene una versión más nueva que la publicada. La hora pasa a la zona horaria del celular
+enseguida, sin reiniciar.
 
-### Lo nuevo de la 0.6.0
+### Lo nuevo de la 0.9.0
 
-- **Versión propia:** la versión del Calandria se ve en *Estado* y viaja en el beacon de
-  CalandriApp (`ver=`).
-- **Aviso de firmware nuevo:** *Estado* muestra "Firmware nuevo: X.Y.Z" cuando CalandriApp avisa
-  que hay un release más nuevo.
-- **Zona horaria al instante:** la zona horaria del celular se aplica apenas la manda la app, sin
-  reiniciar.
-- **Limpiar fantasmas:** respeta favoritos e ignorados, y escribe la NodeDB en flash una sola vez.
+- **Mensajes directos:** los que mandás desde el MK1 (respuesta rápida o teclado) se ven en la
+  conversación y pasan de "enviando" a "entregado" (o "no entregado") con el ACK. El historial guarda
+  50 mensajes en vez de 20, así un canal con mucho tráfico no se lleva los directos.
+- **WiFi:** se prende y se apaga desde *ESTADO → WiFi*, con salida de emergencia (ver [WiFi](#wifi)).
+
+La 0.7.0 trajo la navegación por carátulas, y la 0.8.0, arreglos sobre ella.
 
 ## Flashear un release ya compilado
 
@@ -147,42 +148,67 @@ El resultado queda en `.pio/build/<entorno>/`. La consola serie va por el USB na
 
 ## Uso
 
-Con el botón **BOOT** solo ya se puede usar el nodo, así que el encoder es opcional.
+El MK1 arranca en **Inicio**: cuatro carátulas, cada una con un resumen y un contador. Hace falta
+el encoder para moverse. Solo con BOOT se llega al menú de InkHUD.
 
-| Control | Acción |
+| Gesto | Hace |
 |---|---|
-| BOOT corto | Abrir/cerrar el menú. En el teclado: **enviar** |
-| BOOT largo | Siguiente tile. En el teclado: cancelar |
-| Girar el encoder | Cambiar de applet. Dentro de una lista, menú o el teclado: subir/bajar |
-| Encoder corto | Entrar / elegir. Sobre un mensaje: responderlo |
-| Encoder largo | Volver / entrar y salir del modo scroll en los mensajes |
+| Girar el encoder | Moverse por la lista o el contenido |
+| Clic del encoder | Entrar / elegir |
+| BOOT | Volver un nivel. En el Inicio: el menú completo de InkHUD. En el teclado: **enviar** |
+| Mantener BOOT | Volver al Inicio desde cualquier lado. En el teclado: cancelar |
+| Mantener el encoder | Lo mismo que BOOT, salvo donde la pantalla tiene su propia acción |
 
-Applets que agrega esta variante:
-
-- **Nodes:** ordenada por último escuchado, con saltos y antigüedad. Cada nodo tiene una ficha con
-  *Mensaje directo*, *Medir señal* (traceroute), *Radar* y *Olvidar nodo* (pulsando dos veces, sin
-  reiniciar).
+- **MENSAJES:** las conversaciones: *Grupo* (canal 0), *Público* (canal 1), los demás canales en
+  uso y un directo por persona, con ● si hay sin leer. Clic abre la conversación (remitente, hora,
+  saltos; en los tuyos "✓ entregado"). Clic sobre un mensaje: responder con una respuesta rápida o
+  con el teclado. Un mensaje nuevo aparece solo; BOOT te vuelve a donde estabas.
+- **NODOS:** todos los nodos, el último oído arriba, con distancia, rumbo y saltos. Los perdidos
+  van tachados (1 h sin oírlos; 13 h si son ROUTER). Al final, el **Radar** con los 10 más cerca.
+  La ficha de cada nodo tiene *Mandarle un mensaje*, *Medir señal* (traceroute: ida y vuelta con el
+  SNR de cada tramo y el más flojo), *Rastrearlo* (brújula), *Marcar favorito* y *Olvidar nodo*.
+- **RUMBO:** *Rastrear un nodo*, *Waypoints* (del más cerca al más lejos), *Mapa del grupo* y
+  *Mi posición*. La brújula va **con el norte arriba**: la placa no tiene magnetómetro, así que no
+  puede saber hacia dónde mirás. Tu posición la toma del celular por Bluetooth.
+- **ESTADO:** batería, uso del canal, temperatura y humedad (SHTC3) y versión. Abajo: *Ajustes*
+  (ahorro de energía, girar pantalla, hora local, limpiar fantasmas, reiniciar, menú completo),
+  *WiFi*, *Bluetooth · PIN* y *Apagar*.
 - **Nodos fantasma:** al reflashear o cambiar la placa, un nodo puede cambiar de número y el viejo
-  queda en la lista con el mismo nombre. *Menú → Node Config → Reset NodeDB → Limpiar fantasmas*
-  olvida los duplicados más viejos (mismo nombre largo, oídos antes) y los que no se oyen hace más
-  de 7 días, sin reiniciar. Los favoritos y los ignorados no se tocan. Es el mismo criterio que *Limpiar fantasmas* de CalandriApp.
-- **Waypoints:** elegís un waypoint y ves la distancia y el rumbo. La brújula va **con el norte
-  arriba**: la placa no tiene magnetómetro, así que no puede saber hacia dónde mirás.
-- **Radar:** los 10 nodos más cercanos a escala, con una flecha al más cercano o al que fijaste.
-- **Estado:** temperatura y humedad (SHTC3), batería, hora, vecinos directos, uso del canal,
-  tiempo de aire, la versión del Calandria y si hay una más nueva.
+  queda en la lista con el mismo nombre. *ESTADO → Ajustes → Limpiar fantasmas* olvida los
+  duplicados más viejos (mismo nombre largo, oídos antes) y los que no se oyen hace más de 7 días,
+  sin reiniciar. Los favoritos y los ignorados no se tocan. Es el mismo criterio que *Limpiar
+  fantasmas* de CalandriApp.
 
-Tu propia posición la toma del celular por Bluetooth.
+### WiFi
+
+Sirve para dejar el MK1 en casa o en una base fija con conexión. **Mientras el WiFi está prendido,
+el Bluetooth queda apagado** (en el ESP32 no andan juntos), así que la app no se puede conectar por
+Bluetooth.
+
+- La red y la clave se cargan desde la app. Con la perilla no se escriben.
+- *ESTADO → WiFi* muestra la red, si está conectado (con la IP) y la hora por internet. *Prender
+  WiFi* pide confirmación. Prender o apagar el WiFi reinicia el nodo. Sin una red cargada no se
+  puede prender.
+- **Salida de emergencia**, para que nunca quede sin WiFi y sin Bluetooth:
+  - Si a los 3 minutos de arrancar el WiFi no conectó, el Inicio muestra "WiFi sin conexión".
+    Un clic lo apaga y vuelve el Bluetooth.
+  - Sin mirar la pantalla: **mantené apretada la perilla del encoder mientras lo prendés o lo
+    enchufás**. Arranca con el WiFi apagado y el Bluetooth andando. (BOOT no sirve: apretado al
+    enchufar pone la placa en modo de grabación.)
+- Actualizar con el web flasher anda igual con el WiFi prendido: es por USB.
 
 ### A batería
 
 La placa tiene un latch de alimentación por hardware. Para prenderla a batería, **mantené PWR
 apretado 1 o 2 segundos**, hasta que el firmware tome el control. Para apagarla, mantené PWR 3
-segundos o usá *Save & Shut Down* en el menú. Con el USB enchufado anda siempre.
+segundos o usá *ESTADO → Apagar*. Con el USB enchufado anda siempre.
 
 ## Estado
 
-Funcionando y en uso diario: radio, e-paper, InkHUD, botón BOOT, encoder y los applets nuevos.
+Funcionando y en uso diario: radio, e-paper, InkHUD, botón BOOT, encoder, el Inicio con las
+carátulas y los mensajes de canal.
+
+Sin probar en la placa todavía: los mensajes directos de la 0.9.0 y el WiFi.
 
 Sin verificar del todo:
 

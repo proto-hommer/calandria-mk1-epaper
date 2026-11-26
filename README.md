@@ -3,7 +3,7 @@
 **Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa
 de Seeed cableado a mano. Es el complemento de hardware de [CalandriApp](https://github.com/proto-hommer/calandriapp).**
 
-Versión **Calandria 0.6.0** (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
+Versión **Calandria 0.9.0** (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
 [![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
 ![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-ff7a2f)
@@ -62,7 +62,8 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 - Radio LoRa (Wio-SX1262), pantalla e-paper y encoder, probados en la placa.
 - Mensajes de canal y directos, responder, teclado en pantalla y aviso **"No entregado"** con el motivo
   cuando un mensaje vuelve con error.
-- Lista de nodos con ficha, medición de señal (traceroute), radar, brújula de waypoints y pantalla de estado.
+- El Inicio con las cuatro carátulas: conversaciones, lista de nodos con ficha y medición de señal
+  (traceroute), radar, brújulas, estado y ajustes.
 - La posición propia se recupera al reiniciar, sin esperar al celular.
 - Anuncio de identidad para CalandriApp.
 
@@ -70,8 +71,8 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 - **A batería:** que el latch la mantenga prendida al soltar PWR, el apagado completo y el deep sleep.
 - La **lectura de batería**, que no está calibrada contra una medición real.
-- Lo nuevo de la v2.8.3-ws154.4 en la placa: la línea de posición en Estado y los mensajes rápidos al
-  responder o al mandar un DM.
+- Lo nuevo de la 0.9.0: los **mensajes directos** propios con "entregado", y el **WiFi** con su salida
+  de emergencia.
 - **GPS:** el módulo todavía no está instalado.
 
 * * *
@@ -86,13 +87,13 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 | **Seeed Wio-SX1262 for XIAO** | La radio LoRa. TCXO de 1,8 V, DIO2 como RF switch |
 | **Antena LoRa** de tu banda (915 / 868 / 433 MHz) | Sin antena no se transmite: **conectala antes de energizar** |
 | Cable esmaltado fino | Para puentear la radio a la placa |
+| **Encoder rotativo EC11** con pulsador | Para moverte por el Inicio y las carátulas, y el teclado en pantalla. Hay que desoldar el codec ES8311 |
 
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-opcional.png" alt="Opcional" height="26"/></p>
 
 | Pieza | Para qué |
 |---|---|
 | Batería LiPo | Uso portátil. La placa tiene conector y cargador |
-| **Encoder rotativo EC11** con pulsador | Navegación rápida y teclado en pantalla. Hay que desoldar el codec ES8311. Sin encoder, todo se usa con el botón BOOT |
 | Teclado **CardKB** (I2C) | Escribir mensajes más rápido |
 | **GPS NEO-6M** (GY-NEO6MV2) | Próximamente, ver "Lo que viene" |
 
@@ -220,54 +221,79 @@ usás para otra cosa, la placa queda sin forma práctica de reflashear.
 
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/funciones.png" alt="Funciones" width="100%"/></p>
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-nodes.png" alt="Nodes" height="26"/></p>
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-inicio.png" alt="Inicio" height="26"/></p>
 
-La lista de nodos ordenada por último escuchado, con saltos (`d` = directo) y antigüedad. Cada nodo
-abre una **ficha** con SNR y distancia ("a 3 km al NE"), y tres acciones: **Mensaje directo**,
-**Medir señal** (traceroute: con qué SNR nos oyen) y **Radar**.
+El MK1 arranca en el **Inicio**: cuatro carátulas, una por renglón, cada una con su resumen y un
+contador. Arriba, tu nombre corto, la batería (⚡ si está enchufada) y la hora.
+
+| Carátula | Qué tiene |
+|---|---|
+| **MENSAJES** | Las conversaciones, con los sin leer marcados |
+| **NODOS** | Los nodos oídos, la ficha de cada uno y el Radar |
+| **RUMBO** | Brújula a un nodo, waypoints, mapa del grupo y tu posición |
+| **ESTADO** | Batería, canal, ambiente, versión, ajustes y WiFi |
+
+Nunca más de dos niveles: Inicio, carátula, y lo que abrís adentro.
 
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-mensajes.png" alt="Mensajes" height="26"/></p>
 
-Sobre cualquier conversación, un clic del encoder **responde**: si era un DM, al remitente; si era
-un canal, al canal. Al responder o al mandar un DM aparecen primero los **mensajes rápidos** cargados
-desde la app, y después "Free Text" para escribir. Los canales aparecen con su nombre y dicen cuál es
-el **privado** y cuál el **público**. Si un mensaje no llega, aparece **"No entregado"** con el motivo
-(por ejemplo, "clave" cuando el otro nodo no puede descifrarlo).
+*Grupo* y *Público* primero, después un renglón por cada **directo**, con ● si hay sin leer. Al abrir
+una conversación ves cada mensaje con remitente, hora y saltos; los tuyos dicen **"✓ entregado"**,
+"enviado" o "no entregado". Clic sobre un mensaje y lo respondés: arriba la cita, después los
+**mensajes rápidos** cargados desde la app y al final "Escribir con el teclado". Un mensaje nuevo
+aparece solo en pantalla, y BOOT te devuelve a donde estabas.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-nodos.png" alt="Nodos" height="26"/></p>
+
+Todos los nodos, el último oído arriba, con distancia y rumbo ("1,2 km NO") y saltos. Los
+**perdidos** van tachados: un cliente a la hora sin oírlo, un router a las 13 horas, igual que en
+CalandriApp. Cada nodo abre una **ficha** con cuatro datos (oído, enlace, distancia, batería) y sus
+acciones: **mandarle un mensaje**, **medir señal**, **rastrearlo** con la brújula, **favorito** y
+**olvidarlo**. *Medir señal* manda un traceroute y muestra la **ida** y la **vuelta** con el SNR de
+cada tramo ("VOS -3 dB » BASE -8 dB » JUAN"), cuántos saltos hay y cuál es el tramo más flojo. Al
+final de la lista está el **Radar**: los 10 nodos más cercanos dibujados a escala.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-rumbo.png" alt="Rumbo" height="26"/></p>
+
+Se llama rumbo y no GPS porque el MK1 no tiene GPS: su posición la manda el celular. **Rastrear un
+nodo** muestra una flecha grande hacia él, la distancia y el rumbo ("NO 293°"); girando cambiás de
+nodo. **Waypoints** los ordena del más cerca al más lejos y abre la misma brújula. También están el
+**mapa del grupo** y **mi posición**, con hace cuánto la mandó el celular. La brújula va con el
+**norte arriba**: la placa no tiene magnetómetro, así que no simula una orientación que no existe.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-estado.png" alt="Estado" height="26"/></p>
+
+Cuatro recuadros: **batería** ("enchufada · cargando", "enchufada · llena" o "a batería"), **uso del
+canal**, **ambiente** (temperatura y humedad del SHTC3) y **firmware** (la versión, "al día" o "hay
+X.Y.Z" si CalandriApp avisó una más nueva). Abajo, **Ajustes** (ahorro de energía, girar pantalla, hora
+local, limpiar fantasmas, reiniciar y el menú completo), **WiFi**, **Bluetooth · PIN** y **Apagar**.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-wifi.png" alt="WiFi" height="26"/></p>
+
+Para dejar el MK1 en casa o en una base fija. **Con el WiFi prendido el Bluetooth se apaga**: en el
+ESP32 no andan juntos, así que la app no se puede conectar. La red y la clave se cargan desde la app;
+desde *ESTADO → WiFi* se prende y se apaga (reinicia el nodo) y se ve si conectó, con la IP y la
+hora por internet. Si no conecta en 3 minutos, el Inicio ofrece apagarlo con un clic. Y sin mirar
+la pantalla, **mantener apretada la perilla al prenderlo** arranca con el WiFi apagado y el
+Bluetooth andando.
 
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-teclado-en-pantalla.png" alt="Teclado en pantalla" height="26"/></p>
 
 Girás para recorrer las letras, apretás el encoder para elegir y BOOT envía. Tiene minúsculas,
 mayúsculas, números, símbolos, espacio y borrar.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-waypoints.png" alt="Waypoints" height="26"/></p>
-
-Elegís un waypoint y ves la **distancia y el rumbo**. La brújula va con el **norte arriba**: la
-placa no tiene magnetómetro, así que no simula una orientación que no existe: la "N" del dial
-siempre marca el norte.
-
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-radar.png" alt="Radar" height="26"/></p>
-
-Los 10 nodos más cercanos dibujados a escala, con una flecha al más cercano o al que fijaste desde
-su ficha. Después de un reinicio usa la última posición guardada hasta que el celular mande una nueva.
-
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-estado.png" alt="Estado" height="26"/></p>
-
-Temperatura y humedad (SHTC3), batería, hora (RTC), vecinos directos, uso del canal y tiempo de aire.
-También dice de dónde viene tu posición y qué edad tiene: "Posición: del celu hace 40 s",
-"Posición guardada, hace 3 h" o "Sin posición: conectá el celu".
-
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-controles.png" alt="Controles" height="26"/></p>
 
-| Control | Acción |
-|---|---|
-| BOOT corto | Abrir/cerrar el menú. En el teclado: **enviar** |
-| BOOT largo | Siguiente tile. En el teclado: cancelar |
-| Girar el encoder | Cambiar de applet. Dentro de una lista: subir/bajar |
-| Encoder corto | Entrar / elegir / responder |
-| Encoder largo | Volver |
-| PWR 3 s | Apagar |
+Los mismos gestos en todas las pantallas:
 
-Sin encoder, **todo se puede hacer con BOOT** y el menú.
+| Gesto | Hace |
+|---|---|
+| Girar el encoder | Moverse por la lista o el contenido |
+| Clic del encoder | Entrar / elegir |
+| BOOT | Volver un nivel. En el Inicio: el menú completo. En el teclado: **enviar** |
+| Mantener BOOT | Volver al Inicio. En el teclado: cancelar |
+| Perilla apretada al prender | Arrancar con el WiFi apagado |
+| PWR 3 s | Apagar |
 
 * * *
 

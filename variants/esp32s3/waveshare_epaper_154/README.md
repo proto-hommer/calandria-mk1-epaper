@@ -12,8 +12,8 @@
 
 A custom Meshtastic variant for the **Waveshare ESP32-S3-ePaper-1.54** (V2, no touch) with a
 **Seeed Wio-SX1262 for XIAO** LoRa module wired by hand. It uses InkHUD on the 1.54" e-paper and
-adds an optional EC11 rotary encoder with its own UI: node list, direct messages, replies, an
-on-screen keyboard, a waypoint compass, a radar of nearby nodes and a status screen.
+adds an EC11 rotary encoder with its own UI: a home screen with four cards (messages, nodes,
+heading and status), conversations, signal measurement, compasses, a radar of nearby nodes and WiFi.
 
 > This is an unofficial community build, not supported by Meshtastic or Waveshare.
 >
@@ -31,7 +31,7 @@ on-screen keyboard, a waypoint compass, a radar of nearby nodes and a status scr
 | LoRa antenna for your region | **Always connect it before powering on.** Transmitting without an antenna can damage the SX1262 |
 | Thin wire (enamelled wire works) | For the radio wiring |
 | LiPo battery (optional) | Board's battery connector |
-| EC11 rotary encoder with push button (optional) | 20 detents per turn |
+| EC11 rotary encoder with push button | 20 detents per turn |
 
 The microSD slot is **not used**: its pads carry the radio signals. Leave it empty. The ES8311
 audio codec is not used either. For the encoder, desolder the codec and wire the encoder to three
@@ -57,7 +57,7 @@ Board schematic: [Waveshare wiki](https://www.waveshare.com/wiki/ESP32-S3-ePaper
 
 Check the Wio-SX1262 pinout from Seeed to find each signal on the module.
 
-### Rotary encoder (optional)
+### Rotary encoder
 
 | Encoder pin | GPIO | ES8311 pad (codec removed) |
 |---|---|---|
@@ -66,6 +66,7 @@ Check the Wio-SX1262 pinout from Seeed to find each signal on the module.
 | Push button | 14 | 2 (I2S_MCLK) |
 | Common + second button pin | GND | — |
 
+It is needed to move around Inicio and its cards: BOOT alone only reaches the InkHUD menu.
 Internal pull-ups are used, so no resistors are needed. If turning goes the wrong way, swap
 `ENCODER_PIN_A` and `ENCODER_PIN_B` in `variant.h`.
 
@@ -90,19 +91,19 @@ The first releases used another scheme. Their tags stay as they are:
 | `v2.8.3-ws154.4` | 0.4.0 |
 | `v2.8.3-ws154.5` | 0.5.0 |
 
-The node shows its version in *Estado*. With CalandriApp connected (1.8.5 or later), *Estado* also
-shows "Firmware nuevo: X.Y.Z" when a newer release is out (the node has no internet: the app tells
-it), and the clock switches to the phone's timezone right away, with no reboot.
+The node shows its version in *ESTADO → Firmware*. With CalandriApp connected (1.8.5 or later) it
+reads "al día" (up to date), "hay X.Y.Z" when a newer release is out (the app tells it) or "de
+prueba" when the node runs something newer than the published release. The clock switches to the
+phone's timezone right away, with no reboot.
 
-### What's new in 0.6.0
+### What's new in 0.9.0
 
-- **Own version:** the Calandria version is shown in *Estado* and sent in the CalandriApp beacon
-  (`ver=`).
-- **New firmware notice:** *Estado* shows "Firmware nuevo: X.Y.Z" when CalandriApp reports a newer
-  release.
-- **Timezone right away:** the phone's timezone applies as soon as the app sends it, no reboot.
-- **Limpiar fantasmas:** keeps favorites and ignored nodes, and writes the NodeDB to flash only
-  once.
+- **Direct messages:** the ones you send from the MK1 (canned reply or keyboard) show in the
+  conversation and go from "enviando" (sending) to "entregado" (delivered), or "no entregado", with
+  the ACK. The history keeps 50 messages instead of 20, so a busy channel no longer pushes DMs out.
+- **WiFi:** switched on and off from *ESTADO → WiFi*, with an emergency way out (see [WiFi](#wifi)).
+
+0.7.0 brought the card navigation, and 0.8.0 fixes on top of it.
 
 ## Flashing a prebuilt release
 
@@ -145,42 +146,64 @@ Output goes to `.pio/build/<env>/`. The serial console is on native USB CDC.
 
 ## Usage
 
-The **BOOT** button alone is enough to use the node, so the encoder is optional.
+The MK1 starts on **Inicio** (home): four cards, each with a summary and a counter. The encoder is
+needed to move around. BOOT alone only reaches the InkHUD menu.
 
-| Control | Action |
+| Gesture | Does |
 |---|---|
-| BOOT short | Open/close the menu. In the keyboard: **send** |
-| BOOT long | Next tile. In the keyboard: cancel |
-| Encoder turn | Change applet. Inside a list, menu or the keyboard: move up/down |
-| Encoder short press | Enter / select. On a message: reply to it |
-| Encoder long press | Go back / toggle scroll mode on message lists |
+| Turn the encoder | Move through the list or the content |
+| Encoder click | Open / choose |
+| BOOT | Back one level. On Inicio: the full InkHUD menu. In the keyboard: **send** |
+| Hold BOOT | Back to Inicio from anywhere. In the keyboard: cancel |
+| Hold the encoder | Same as BOOT, except where a screen has its own action |
 
-Applets added by this variant:
-
-- **Nodes:** sorted by last heard, with hop count and age. Each node has a card with *Direct
-  message*, *Measure signal* (traceroute), *Radar* and *Forget node* (press twice; no reboot).
+- **MENSAJES (messages):** the conversations: *Grupo* (channel 0), *Público* (channel 1), any other
+  channel in use, and one per direct message, with ● when unread. Click opens it (sender, time, hops;
+  yours show "✓ entregado"). Click a message to reply with a canned message or the keyboard. A new
+  message pops up on its own; BOOT takes you back to where you were.
+- **NODOS (nodes):** every node, last heard first, with distance, direction and hops. Lost nodes
+  are struck through (1 h unheard; 13 h for ROUTERs). At the end, the **Radar** with the 10
+  nearest. Each node's card has *message*, *Medir señal* (traceroute: there and back with the SNR of
+  every hop and the weakest one), *track it* (compass), *favorite* and *forget*.
+- **RUMBO (heading):** track a node, waypoints (nearest first), the group map and your own
+  position. The compass is **north-up**: the board has no magnetometer, so it cannot know which way
+  you are facing. Your position comes from the phone over Bluetooth.
+- **ESTADO (status):** battery, channel use, temperature/humidity (SHTC3) and version. Below:
+  *Ajustes* (power saving, rotate screen, local time, clean up ghosts, reboot, full menu), *WiFi*,
+  *Bluetooth · PIN* and *Apagar* (power off).
 - **Ghost nodes:** after a reflash or a board swap a node can get a new number, and the old one
-  stays in the list under the same name. *Menu → Node Config → Reset NodeDB → Limpiar fantasmas*
-  forgets the older duplicates (same long name, heard earlier) and nodes not heard for over 7
-  days, without a reboot. Favorites and ignored nodes are kept. Same rule as CalandriApp's *Clean up ghosts*.
-- **Waypoints:** pick a waypoint to see its distance and bearing. The compass is **north-up**:
-  the board has no magnetometer, so it cannot know which way you are facing.
-- **Radar:** the 10 nearest nodes drawn to scale, with an arrow to the nearest one or to the one
-  you pinned.
-- **Status:** temperature/humidity (SHTC3), battery, time, direct neighbours, channel
-  utilisation, airtime, the Calandria version and whether a newer one is out.
+  stays in the list under the same name. *ESTADO → Ajustes → Limpiar fantasmas* forgets the older
+  duplicates (same long name, heard earlier) and nodes not heard for over 7 days, without a reboot.
+  Favorites and ignored nodes are kept. Same rule as CalandriApp's *Clean up ghosts*.
 
-Your own position comes from the phone over Bluetooth.
+### WiFi
+
+For leaving the MK1 at home or at a fixed base with internet. **While WiFi is on, Bluetooth is off**
+(on the ESP32 they don't run together), so the app cannot connect over Bluetooth.
+
+- The network and password are loaded from the app; they are not typed with the knob.
+- *ESTADO → WiFi* shows the network, whether it is connected (with its IP) and internet time.
+  *Prender WiFi* (turn on) asks first. Turning WiFi on or off reboots the node. Without a network
+  loaded it cannot be turned on.
+- **Emergency way out**, so the node is never left with neither WiFi nor Bluetooth:
+  - If WiFi has not connected 3 minutes after boot, Inicio shows "WiFi sin conexión". One click
+    turns it off and Bluetooth comes back.
+  - Without looking at the screen: **hold the encoder button while you power it on or plug it in**.
+    It boots with WiFi off and Bluetooth on. (Not BOOT: held while plugging in, it puts the board in
+    download mode.)
+- Updating with the web flasher works the same with WiFi on: it goes over USB.
 
 ### Battery power
 
 The board has a hardware power latch. To power on from battery, **hold PWR for 1–2 seconds**
-until the firmware takes over. To power off, hold PWR for 3 seconds or use *Save & Shut Down* in
-the menu. On USB power the board runs regardless.
+until the firmware takes over. To power off, hold PWR for 3 seconds or use *ESTADO → Apagar*. On USB power the board runs regardless.
 
 ## Status
 
-Working and in daily use: radio, e-paper, InkHUD, the BOOT button, the rotary encoder and the new applets.
+Working and in daily use: radio, e-paper, InkHUD, the BOOT button, the rotary encoder, Inicio with
+its cards and channel messages.
+
+Not yet tested on the board: the 0.9.0 direct messages and WiFi.
 
 Not yet fully verified:
 
