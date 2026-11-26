@@ -13,9 +13,15 @@ error: NAKs from the destination (e.g. it could not decrypt a PKI DM), from rela
 own router generates (MAX_RETRANSMIT, missing public key). Covers messages sent from the e-paper and
 from the phone alike. Successful ACKs are ignored.
 
+A failure about keys ("sin su clave": we lack its public key; "no tiene mi clave": it lacks ours) is
+fixed by exchanging NodeInfo, so that pop-up offers it: "clic pide datos" (NodeInfoAsk.h; the click is
+handled by InkHudNavigator).
+
 */
 
+#include "ConversationApplet.h"
 #include "MeshModule.h"
+#include "NodeInfoAsk.h"
 #include "NodeDB.h"
 #include "graphics/niche/InkHUD/Applets/System/Notification/NotificationApplet.h"
 #include "graphics/niche/InkHUD/InkHUD.h"
@@ -52,7 +58,15 @@ class DeliveryWatcher : public MeshModule
 
         char line[48];
         const NodeNum from = getFrom(&mp);
-        if (from == nodeDB->getNodeNum())
+        const bool keyProblem = r.error_reason == meshtastic_Routing_Error_PKI_SEND_FAIL_PUBLIC_KEY ||
+                                r.error_reason == meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY;
+        // Who to ask: the node that answered, or (our own router's NAK) the one the message was for
+        const NodeNum peer = from != nodeDB->getNodeNum() ? from : ConversationApplet::destOf(mp.decoded.request_id);
+        if (keyProblem && peer && peer != NODENUM_BROADCAST) {
+            CalandriaAsk::offer(peer);
+            snprintf(line, sizeof(line), "%s: clic pide datos",
+                     r.error_reason == meshtastic_Routing_Error_PKI_UNKNOWN_PUBKEY ? "No tiene mi clave" : "Sin su clave");
+        } else if (from == nodeDB->getNodeNum())
             snprintf(line, sizeof(line), "No entregado: %s", reason(r.error_reason));
         else
             snprintf(line, sizeof(line), "No entregado: %s (%s)", shortName(from).c_str(), reason(r.error_reason));

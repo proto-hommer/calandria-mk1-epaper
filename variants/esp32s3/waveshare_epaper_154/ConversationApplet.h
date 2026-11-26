@@ -84,6 +84,20 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
 
     static ConversationApplet *get() { return instance; }
 
+    // Destination of one of our sends, by packet id (0 if unknown). For NAKs our own router raises
+    // ("sin su clave"), which come from and to us and do not say who the message was for.
+    static NodeNum destOf(PacketId id)
+    {
+        if (!instance || !id)
+            return 0;
+        if (id == lastFailedId)
+            return lastFailedDest;
+        for (const Sent &s : instance->sent)
+            if (s.id == id)
+                return s.dest;
+        return 0;
+    }
+
     static uint16_t totalUnread()
     {
         uint16_t n = 0;
@@ -200,6 +214,8 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     };
 
     static inline ConversationApplet *instance = nullptr;
+    static inline PacketId lastFailedId = 0;    // kept after its entry leaves `sent` (see destOf)
+    static inline NodeNum lastFailedDest = 0;
     static inline uint16_t chanUnread[8] = {0};
     static inline std::map<NodeNum, uint16_t> dmUnread;
 
@@ -341,8 +357,11 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         if (!pb_decode_from_bytes(mp.decoded.payload.bytes, mp.decoded.payload.size, &meshtastic_Routing_msg, &r))
             return;
         AckStatus st;
-        if (r.which_variant == meshtastic_Routing_error_reason_tag && r.error_reason != meshtastic_Routing_Error_NONE)
+        if (r.which_variant == meshtastic_Routing_error_reason_tag && r.error_reason != meshtastic_Routing_Error_NONE) {
             st = AckStatus::NACKED;
+            lastFailedId = it->id;
+            lastFailedDest = it->dest;
+        }
         else if (getFrom(&mp) == it->dest)
             st = AckStatus::ACKED; // the destination itself
         else

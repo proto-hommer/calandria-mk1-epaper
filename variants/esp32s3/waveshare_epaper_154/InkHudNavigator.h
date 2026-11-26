@@ -18,6 +18,7 @@ it in nicheGraphics.h; this navigator does not change.
 #include "AppletNames.h"
 #include "HubApplet.h"
 #include "InputEvent.h"
+#include "NodeInfoAsk.h"
 
 #include <Arduino.h>
 #include <cstdlib>
@@ -28,6 +29,7 @@ it in nicheGraphics.h; this navigator does not change.
 #include "graphics/niche/InkHUD/InkHUD.h"
 #include "graphics/niche/InkHUD/Persistence.h"
 #include "graphics/niche/InkHUD/SystemApplet.h"
+#include "graphics/niche/InkHUD/Applets/System/Notification/NotificationApplet.h"
 #include "mesh/MeshTypes.h"
 
 namespace NicheGraphics::Inputs
@@ -122,6 +124,14 @@ class InkHudNavigator
 
     void select(InkHUD::InkHUD *h, bool longPress)
     {
+        // A "sin su clave: clic pide datos" pop-up (DeliveryWatcher): the click asks for the node's data
+        if (!longPress && foreground(h, "Notification")) {
+            if (const NodeNum n = CalandriaAsk::takeOffer()) {
+                auto *note = (InkHUD::NotificationApplet *)h->getSystemApplet("Notification");
+                note->showText(CalandriaAsk::resultText(CalandriaAsk::request(n)));
+                return;
+            }
+        }
         InkHUD::Applet *active = h->getActiveApplet();
         if (systemOwnsInput(h) || !active) {
             longPress ? h->longpress() : h->shortpress();
@@ -183,6 +193,7 @@ class InkHudNavigator
 
     void back(InkHUD::InkHUD *h, bool longPress)
     {
+        CalandriaAsk::clearOffer(); // BOOT dismisses the pop-up, and its offer with it
         InkHUD::HubApplet *hub = InkHUD::HubApplet::get();
         if (foreground(h, "Keyboard")) {
             longPress ? h->freeTextCancel() : h->freeTextDone();

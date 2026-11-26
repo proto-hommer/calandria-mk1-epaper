@@ -14,8 +14,11 @@ NODOS: the card itself is the list of nodes ("Últimos oídos"); a node's card i
            own info every 12 h). The last row opens the Radar (the 10 nearest).
   CARD   : four boxes (Oído, Enlace, Distancia, Batería) and the actions: Mandarle un mensaje (keyboard /
            canned, MenuApplet::composeTo), Medir señal, Rastrearlo (the compass of TrackApplet),
+           Pedir datos (NodeInfoAsk.h: our NodeInfo with want_response, so it answers with its own),
            Marcar / Quitar favorito (NodeDB::set_favorite, no admin packet) and Olvidar nodo (removed
            from the NodeDB without a reboot, after a second click).
+           A node without NodeInfo (no name, role or key: a DM to it fails "sin su clave") shows its ID
+           with "sin ficha", and Pedir datos comes first.
   RESULT : Medir señal. A traceroute (sent by StatusApplet, one at a time): IDA (us -> node) and VUELTA
            (node -> us) with the SNR of every hop, the number of hops, how good the link is and its
            weakest hop. "Midiendo…" while waiting, "Sin respuesta" after the timeout. Click measures again.
@@ -31,6 +34,7 @@ the same node, and only redrawn when what it shows changed.
 #include "AppletNames.h"
 #include "MenuAppletInclude.h"
 #include "NavReturn.h"
+#include "NodeInfoAsk.h"
 #include "RadarApplet.h"
 #include "StatusApplet.h"
 #include "TrackApplet.h"
@@ -153,7 +157,32 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
 
   private:
     enum Level : uint8_t { LIST, CARD, RESULT };
-    static constexpr uint8_t ACTIONS = 5;
+    enum Action : uint8_t { MESSAGE, MEASURE, TRACK, ASK, FAVORITE, FORGET };
+    static constexpr uint8_t ACTIONS = 6;
+
+    // The card's actions, in order: a node without NodeInfo needs it first
+    void actionList(Action out[ACTIONS])
+    {
+        static const Action withInfo[ACTIONS] = {MESSAGE, MEASURE, TRACK, ASK, FAVORITE, FORGET};
+        static const Action withoutInfo[ACTIONS] = {ASK, MESSAGE, MEASURE, TRACK, FAVORITE, FORGET};
+        const Action *src = hasInfo(selected) ? withInfo : withoutInfo;
+        for (uint8_t i = 0; i < ACTIONS; i++)
+            out[i] = src[i];
+    }
+
+    static bool hasInfo(NodeNum num)
+    {
+        const meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(num);
+        return n && nodeInfoLiteHasUser(n);
+    }
+
+    // "dac0": the last four hex digits, what Meshtastic uses as a default short name
+    static std::string shortId(NodeNum num)
+    {
+        char b[8];
+        snprintf(b, sizeof(b), "%04x", (unsigned)(num & 0xffff));
+        return b;
+    }
     static constexpr const char *CONFIRM_FORGET = "Clic de nuevo: olvidar";
 
     Level level = LIST;
@@ -306,8 +335,13 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
             requestUpdate(EInk::UpdateTypes::FULL);
             return;
         }
-        switch (action) {
-        case 0: { // message: canned or keyboard, straight to this node
+        Action list[ACTIONS];
+        actionList(list);
+        switch (list[action < ACTIONS ? action : 0]) {
+        case ASK:
+            notice = CalandriaAsk::resultText(CalandriaAsk::request(selected));
+            break;
+        case MESSAGE: { // canned or keyboard, straight to this node
             const ChannelIndex channel = nodeDB->getMeshNodeChannel(selected);
             inkhud->openMenu();
             MenuApplet *menu = (MenuApplet *)inkhud->getSystemApplet("Menu");
@@ -315,10 +349,10 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
                 menu->composeTo(selected, channel);
             return;
         }
-        case 1:
+        case MEASURE:
             measure();
             return;
-        case 2: {
+        case TRACK: {
             float m, b;
             if (!RadarApplet::haveOwnPosition())
                 notice = "Sin posición propia";
@@ -331,7 +365,7 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
             }
             break;
         }
-        case 3: {
+        case FAVORITE: {
             const bool fav = nodeInfoLiteIsFavorite(n);
             if (nodeDB->set_favorite(!fav, selected))
                 notice = fav ? "Quitado de favoritos" : "Marcado como favorito";
@@ -339,7 +373,7 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
                 notice = "No se pudo: límite de favoritos";
             break;
         }
-        default:
+        case FORGET:
             if (notice != CONFIRM_FORGET) {
                 notice = CONFIRM_FORGET;
                 break;
@@ -413,11 +447,15 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
             }
 
             // Left: short name (faux bold), then how long ago
-            const std::string name = shortNameOf(nodes[i]);
+            const bool info = hasInfo(nodes[i]);
+            const std::string name = info ? shortNameOf(nodes[i]) : shortId(nodes[i]);
             setCrop(0, y, width() - rightW, rowH);
             printAt(4, mid, name, LEFT, MIDDLE);
             printAt(5, mid, name, LEFT, MIDDLE);
-            const std::string when = parse(a == UINT32_MAX ? std::string("nunca") : lost ? "perdido · " + ago(a) : ago(a));
+            std::string when = a == UINT32_MAX ? std::string("nunca") : lost ? "perdido · " + ago(a) : ago(a);
+            if (!info)
+                when = "sin ficha · " + when;
+            when = parse(when);
             printAt(42, mid, when, LEFT, MIDDLE);
             resetCrop();
             if (lost) // struck through
@@ -430,7 +468,10 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
     void renderCard()
     {
         const meshtastic_NodeInfoLite *n = nodeDB->getMeshNode(selected);
-        drawBar(longNameOf(selected), shortNameOf(selected), true);
+        if (hasInfo(selected))
+            drawBar(longNameOf(selected), shortNameOf(selected), true);
+        else
+            drawBar(hexifyNodeNum(selected), "sin ficha", true);
 
         const int16_t y0 = barHeight() + 3;
         const uint16_t gap = 3;
@@ -454,15 +495,36 @@ class NodePickerApplet : public CalandriaUI<Applet>, public concurrency::OSThrea
         drawBox(x1, y1, bw, bh, parse("Batería"), bat, "");
 
         const bool fav = n && nodeInfoLiteIsFavorite(n);
-        const char *labels[ACTIONS] = {"Mandarle un mensaje", "Medir señal", "Rastrearlo (brújula)",
-                                       fav ? "Quitar favorito" : "Marcar favorito", "Olvidar nodo"};
+        Action list[ACTIONS];
+        actionList(list);
         setFont(fontSmall);
-        const uint16_t rowH = fontSmall.lineHeight() + 5;
+        const uint16_t rowH = fontSmall.lineHeight() + 4;
         int16_t y = y1 + bh + gap + 1;
         for (uint8_t i = 0; i < ACTIONS; i++) {
             const uint16_t fg = beginRow(y, rowH, i == action);
-            printAt(6, y + rowH / 2, parse(labels[i]), LEFT, MIDDLE);
-            if (i == 2)
+            const char *label = "";
+            switch (list[i]) {
+            case MESSAGE:
+                label = "Mandarle un mensaje";
+                break;
+            case MEASURE:
+                label = "Medir señal";
+                break;
+            case TRACK:
+                label = "Rastrearlo (brújula)";
+                break;
+            case ASK:
+                label = "Pedir datos";
+                break;
+            case FAVORITE:
+                label = fav ? "Quitar favorito" : "Marcar favorito";
+                break;
+            case FORGET:
+                label = "Olvidar nodo";
+                break;
+            }
+            printAt(6, y + rowH / 2, parse(label), LEFT, MIDDLE);
+            if (list[i] == TRACK)
                 drawChevron(width() - 9, y + rowH / 2, fg);
             setTextColor(BLACK);
             y += rowH;
