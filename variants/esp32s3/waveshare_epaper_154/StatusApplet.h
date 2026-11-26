@@ -12,7 +12,10 @@ ESTADO: the card itself. Four boxes and a list.
          utilisation, our TX airtime), Ambiente (the on-board SHTC3, I2C 0x70, read directly: the
          telemetry module keeps its reading in a protected method) and Firmware (our version, with a tick
          when it is the latest CalandriApp told us about, or "hay X" when there is a newer one).
-  List:  Ajustes, WiFi (state only for now), Bluetooth · PIN, Apagar.
+  List:  Ajustes, WiFi, Bluetooth · PIN, Apagar.
+  WiFi:  the network, its state (IP / connecting / why not), Bluetooth off while WiFi is on, time from the
+         internet (NTP), a newer release if the app told us; Prender / Apagar (saves and reboots; turning
+         it on asks first, and needs a network loaded from the app). WifiStatus.h has the details.
   Ajustes: Ahorro de energía, Girar pantalla, Hora local, Limpiar fantasmas, Reiniciar, and the full
          InkHUD menu for anything else. Group, radio and role are set from the app.
 Actions that reboot or power off ask for a second click.
@@ -28,6 +31,7 @@ Redraws only when what it shows changes; refreshes every STATUS_REFRESH_MS while
 
 #include "CalandriaBeacon.h"
 #include "MenuAppletInclude.h"
+#include "WifiStatus.h"
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "PowerStatus.h"
@@ -107,7 +111,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         if (page == MAIN)
             return;
         const Page from = page;
-        cursor = from == BLUETOOTH ? 2 : from == TIMEZONE ? 2 : 0; // back on the row that opened it
+        cursor = from == BLUETOOTH ? 2 : from == TIMEZONE ? 2 : from == WIFI ? 1 : 0; // the row that opened it
         confirm = -1;
         notice.clear();
         setPage(from == TIMEZONE ? SETTINGS : MAIN);
@@ -177,8 +181,9 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
   protected:
     int32_t runOnce() override
     {
-        if (isForeground() && page == MAIN) {
-            readSensor();
+        if (isForeground() && (page == MAIN || page == WIFI)) {
+            if (page == MAIN)
+                readSensor();
             if (signature() != lastSignature)
                 requestUpdate(EInk::UpdateTypes::FAST); // e-paper: only on a visible change
         }
@@ -202,7 +207,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
     }
 
   private:
-    enum Page : uint8_t { MAIN, SETTINGS, TIMEZONE, BLUETOOTH };
+    enum Page : uint8_t { MAIN, SETTINGS, TIMEZONE, BLUETOOTH, WIFI };
     Page page = MAIN;
     uint8_t cursor = 0;
     int8_t confirm = -1; // row waiting for its confirming second click
@@ -253,6 +258,8 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         case TIMEZONE:
             tzOptions(&n);
             return n;
+        case WIFI:
+            return 1;
         default:
             return 0;
         }
@@ -318,7 +325,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
                 open(SETTINGS);
                 break;
             case 1:
-                say(config.network.wifi_enabled ? "WiFi: se configura desde la app" : "WiFi: llega en la 0.8.0");
+                open(WIFI);
                 break;
             case 2:
                 open(BLUETOOTH);
@@ -360,6 +367,16 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
             default:
                 inkhud->openMenu();
                 break;
+            }
+        } else if (page == WIFI) {
+            if (CalandriaWifi::enabled()) {
+                CalandriaWifi::setEnabledAndReboot(false);
+                inkhud->notifyApplyingChanges();
+            } else if (!CalandriaWifi::haveNetwork()) {
+                say("Cargá la red desde la app");
+            } else if (confirmed("Se apaga el Bluetooth: la app no va a poder conectarse. Clic de nuevo: prender")) {
+                CalandriaWifi::setEnabledAndReboot(true);
+                inkhud->notifyApplyingChanges();
             }
         } else if (page == TIMEZONE) {
             uint8_t n;
@@ -420,6 +437,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         s += haveSensor ? fmt("%.1f/%.0f", tempC, humidity) : std::string("x");
         s += std::to_string(CalandriaLatest::standing()) + CalandriaLatest::versionLabel();
         s += getValidTime(RTCQuality::RTCQualityDevice) ? getTimeString() : std::string("");
+        s += CalandriaWifi::stateLine() + (CalandriaWifi::timeFromInternet() ? "t" : "");
         return s;
     }
 
@@ -474,7 +492,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
     bool rowOpensPage(uint8_t i)
     {
         if (page == MAIN)
-            return i == 0 || i == 2;
+            return i <= 2;
         return page == SETTINGS && (i == 2 || i == 5);
     }
 
@@ -506,14 +524,22 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
             setTextColor(BLACK);
         }
         drawScrollHints(first > 0, first + rows < n);
-        if (!notice.empty())
-            printAt(4, height() - 2, parse(notice), LEFT, BOTTOM);
+        if (!notice.empty()) { // at the bottom, wrapped (a confirmation can be two lines)
+            const std::string t = parse(notice);
+            const uint16_t h = getWrappedTextHeight(4, width() - 8, t);
+            fillRect(0, height() - h - 3, width(), h + 3, WHITE);
+            printWrapped(4, height() - h - 1, width() - 8, t);
+        }
     }
 
     void renderList()
     {
         if (page == BLUETOOTH) {
             renderBluetooth();
+            return;
+        }
+        if (page == WIFI) {
+            renderWifi();
             return;
         }
         if (page == SETTINGS) {
@@ -535,6 +561,43 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
             right[i] = strcmp(o[i].tz, config.device.tzdef) ? "" : "actual";
         }
         drawRows(barHeight() + 3, labels, right, n < 8 ? n : 8);
+    }
+
+    void renderWifi()
+    {
+        drawBar("WIFI", CalandriaWifi::enabled() ? parse("SÍ") : std::string("NO"), true);
+        setFont(fontSmall);
+        const uint16_t lh = fontSmall.lineHeight() + 3;
+        int16_t y = barHeight() + 4;
+
+        setFont(fontMedium);
+        setCrop(0, y, width(), fontMedium.lineHeight() + 2);
+        printAt(4, y, CalandriaWifi::haveNetwork() ? parse(config.network.wifi_ssid) : std::string("Sin red cargada"));
+        resetCrop();
+        y += fontMedium.lineHeight() + 3;
+        setFont(fontSmall);
+        printAt(4, y, parse(CalandriaWifi::stateLine()));
+        y += lh;
+        printAt(4, y, "Bluetooth apagado mientras haya WiFi");
+        y += lh;
+        if (CalandriaWifi::enabled()) {
+            const std::string ntp = CalandriaWifi::timeFromInternet() ? parse("Hora por internet: SÍ · ") + config.network.ntp_server
+                                                                       : std::string("Hora por internet: esperando");
+            setCrop(0, y, width(), lh);
+            printAt(4, y, ntp);
+            resetCrop();
+            y += lh;
+        }
+        if (CalandriaLatest::standing() == CalandriaLatest::OUTDATED) {
+            printAt(4, y, parse(std::string("Hay ") + CalandriaLatest::versionLabel() + " · actualizá con el web flasher"));
+            y += lh;
+        }
+
+        static const char *const on[1] = {"Prender WiFi"};
+        static const char *const off[1] = {"Apagar WiFi"};
+        drawRows(y + 3, CalandriaWifi::enabled() ? off : on, nullptr, 1);
+        if (notice.empty()) // the footer, where notices go
+            printAt(4, height() - 2, "Prender o apagar el WiFi reinicia el nodo", LEFT, BOTTOM);
     }
 
     void renderBluetooth()

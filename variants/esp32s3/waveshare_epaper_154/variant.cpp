@@ -1,10 +1,16 @@
 #include "configuration.h"
 #include "CalandriaBeacon.h"
 #include "OwnPosition.h"
+#include "WifiStatus.h"
 #include "concurrency/OSThread.h"
 #include "main.h"
 #include <Arduino.h>
 #include <driver/gpio.h>
+
+#ifdef MESHTASTIC_INCLUDE_INKHUD
+#include "graphics/niche/InkHUD/Applets/System/Notification/NotificationApplet.h"
+#include "graphics/niche/InkHUD/InkHUD.h"
+#endif
 
 // Battery power latch (see CLAUDE.md section 4).
 // The PWR button connects VBAT to VSYS only while pressed. Driving BAT_CONTROL_PIN HIGH saturates
@@ -73,6 +79,17 @@ void lateInitVariant()
     LOG_INFO("Battery latch: GPIO%d held HIGH", BAT_CONTROL_PIN);
 
     new PowerKeyThread();
+
+    // Way out of a WiFi that does not connect, without the screen: encoder button held while powering
+    // on. Here, before initWifi() and before Bluetooth starts, so turning WiFi off needs no reboot.
+    if (CalandriaWifi::checkEmergencyGesture()) {
+#ifdef MESHTASTIC_INCLUDE_INKHUD
+        using namespace NicheGraphics::InkHUD;
+        for (SystemApplet *sa : InkHUD::getInstance()->systemApplets)
+            if (sa->name && strcmp(sa->name, "Notification") == 0)
+                static_cast<NotificationApplet *>(sa)->showText("WiFi apagado: vuelve el Bluetooth");
+#endif
+    }
 
     // No GPS: our position only lives in RAM until the phone sends one. Bring back the saved one.
     OwnPosition::restore();

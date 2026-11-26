@@ -35,6 +35,7 @@ HUB_REFRESH_MS.
 #include "StatusApplet.h"
 #include "TrackApplet.h"
 #include "WaypointCompassApplet.h"
+#include "WifiStatus.h"
 
 #include "MessageStore.h"
 #include "NodeDB.h"
@@ -149,7 +150,10 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
 
     void onButtonShortPress() override
     {
-        if (level == HOME)
+        if (level == HOME && cursor == WIFI_ROW) {
+            CalandriaWifi::setEnabledAndReboot(false); // back to Bluetooth
+            inkhud->notifyApplyingChanges();
+        } else if (level == HOME)
             openCard((Card)cursor);
         else
             openRouteItem(item);
@@ -179,11 +183,16 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
   private:
     enum Level : uint8_t { HOME, CARD };
     static constexpr uint8_t ROUTE_ITEMS = 4;
+    static constexpr uint8_t WIFI_ROW = CARDS; // HOME cursor on the "WiFi sin conexión" banner
+
+    // WiFi on but not connecting (WifiStatus.h): HOME shows a banner that turns it off
+    static bool wifiBanner() { return CalandriaWifi::stuck(); }
 
     static inline HubApplet *instance = nullptr;
 
     Level level = HOME;
-    uint8_t cursor = 0; // HOME: which card
+    uint8_t cursor = 0; // HOME: which card (WIFI_ROW: the WiFi banner)
+    bool shownBanner = false;
     uint8_t item = 0;   // RUMBO: which entry
     std::string lastSignature;
 
@@ -251,6 +260,17 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
 
     void move(int dir)
     {
+        if (level == HOME && wifiBanner()) { // banner first, then the four cards
+            const int order = cursor == WIFI_ROW ? 0 : cursor + 1;
+            const int next = order + dir;
+            if (next < 0 || next > CARDS)
+                return;
+            cursor = next == 0 ? WIFI_ROW : (uint8_t)(next - 1);
+            requestUpdate(EInk::UpdateTypes::FAST);
+            return;
+        }
+        if (cursor == WIFI_ROW)
+            cursor = 0; // the banner went away (connected)
         const uint8_t n = level == HOME ? (uint8_t)CARDS : ROUTE_ITEMS;
         uint8_t &pos = level == HOME ? cursor : item;
         const int next = (int)pos + dir;
@@ -389,7 +409,9 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
         }
         default: {
             summary = charging() ? "Cargando" : plugged() ? "Enchufada" : "A batería";
-            summary += config.network.wifi_enabled ? " · WiFi prendido" : " · WiFi apagado";
+            summary += !CalandriaWifi::enabled()  ? " · WiFi apagado"
+                       : CalandriaWifi::connected() ? " · WiFi conectado"
+                                                    : " · WiFi sin conexión";
             summary = parse(summary);
             if (powerStatus && powerStatus->getHasBattery())
                 counter = std::to_string(powerStatus->getBatteryChargePercent()) + "%";
@@ -412,7 +434,7 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
     // Everything HOME shows: redraw only when this changes
     std::string signature()
     {
-        std::string s = clock() + batteryText() + (plugged() ? "+" : "");
+        std::string s = clock() + batteryText() + (plugged() ? "+" : "") + (wifiBanner() ? "W" : "");
         for (uint8_t c = 0; c < CARDS; c++) {
             std::string a, b;
             cardInfo((Card)c, a, b);
@@ -463,7 +485,24 @@ class HubApplet : public CalandriaUI<Applet>, public concurrency::OSThread
             right = bat + "  " + right;
         drawBar(me, right, false, plugged());
 
-        const int16_t top = barHeight() + 1;
+        int16_t top = barHeight() + 1;
+        if (wifiBanner()) {
+            if (!shownBanner && cursor != WIFI_ROW)
+                cursor = WIFI_ROW; // first time it shows: select it, so one click gets the app back
+            shownBanner = true;
+            setFont(fontSmall);
+            const uint16_t h = 2 * fontSmall.lineHeight() + 6;
+            const uint16_t fg = beginRow(top, h, cursor == WIFI_ROW);
+            if (cursor != WIFI_ROW)
+                drawRect(0, top, width(), h, BLACK);
+            printAt(6, top + 2, parse("WiFi sin conexión"));
+            printAt(6, top + 3 + fontSmall.lineHeight(), "Clic: apagarlo y volver al Bluetooth");
+            (void)fg;
+            setTextColor(BLACK);
+            top += h + 2;
+        } else if (cursor == WIFI_ROW) {
+            cursor = 0;
+        }
         const uint16_t rowH = (height() - top) / CARDS;
         for (uint8_t c = 0; c < CARDS; c++) {
             const int16_t y = top + c * rowH;
