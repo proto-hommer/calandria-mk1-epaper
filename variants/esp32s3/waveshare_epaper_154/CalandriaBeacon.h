@@ -48,7 +48,7 @@ constexpr meshtastic_PortNum CALANDRIA_PORT = (meshtastic_PortNum)(meshtastic_Po
 constexpr const char *CALANDRIA_MODEL = "Calandria MK1 epaper";
 // The Calandria's own semantic version (alpha: 0.x). APP_VERSION stays Meshtastic's (2.8.3.<hash>): apps use it
 // to know which features the firmware has. ws154.1 .. ws154.5 = 0.1.0 .. 0.5.0
-constexpr const char *CALANDRIA_VERSION = "0.9.2";
+constexpr const char *CALANDRIA_VERSION = "0.9.3";
 
 // Latest release, as told by CalandriApp. Empty until the phone sends it.
 struct CalandriaLatest {
