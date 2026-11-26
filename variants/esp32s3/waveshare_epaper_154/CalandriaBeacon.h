@@ -21,8 +21,10 @@ When:    5 min after boot, then every 6 h, skipped while the channel is busy. A 
 Update notice: on connecting, CalandriApp (which can see GitHub releases) sends the LOCAL node, from our
 own phone and without want_response:
          CALANDRIA/1;latest=<release tag>;commit=<full sha>
-Kept in RAM (the app resends it on every connection). If the commit does not start with our own build
-hash (last part of APP_VERSION), Estado shows "Firmware nuevo: <version>". Ignored from the mesh.
+Kept in RAM (the app resends it on every connection). A "calandria-x.y.z" tag is compared by version
+number with CALANDRIA_VERSION (newer published: Estado shows "hay x.y.z"; same: "al día"; ours newer, a
+build not published yet: "de prueba"); old "v2.8.3-ws154.N" tags by commit against our build hash (last
+part of APP_VERSION). Ignored from the mesh.
 
 */
 
@@ -33,6 +35,7 @@ hash (last part of APP_VERSION), Estado shows "Firmware nuevo: <version>". Ignor
 #include "mesh/Throttle.h"
 
 #include <cctype>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 
@@ -60,16 +63,60 @@ struct CalandriaLatest {
         return dot ? dot + 1 : v;
     }
 
-    static bool updateAvailable()
+    // How our firmware stands against the latest release:
+    //  - "calandria-x.y.z" tags: by version number against CALANDRIA_VERSION, so a newer build that is
+    //    not published yet (or a test build) is never "out of date";
+    //  - old tags ("v2.8.3-ws154.N"): by commit, the only thing they can be compared by.
+    enum Standing : uint8_t { UNKNOWN, OUTDATED, CURRENT, AHEAD };
+
+    static Standing standing()
     {
+        if (!tag[0] || !commit[0])
+            return UNKNOWN;
+        int latest[3], ours[3];
+        if (parseVersion(semverOf(tag), latest) && parseVersion(CALANDRIA_VERSION, ours)) {
+            for (int i = 0; i < 3; i++)
+                if (latest[i] != ours[i])
+                    return latest[i] > ours[i] ? OUTDATED : AHEAD;
+            return CURRENT;
+        }
         const char *own = ownHash();
         const size_t n = strlen(own);
-        if (!tag[0] || !commit[0] || n < 7 || n > 40)
-            return false;
+        if (n < 7 || n > 40)
+            return UNKNOWN;
         for (size_t i = 0; i < n; i++)
             if (tolower((unsigned char)own[i]) != tolower((unsigned char)commit[i]))
-                return true; // commit[] is NUL-padded: a shorter commit also mismatches here
-        return false;
+                return OUTDATED; // commit[] is NUL-padded: a shorter commit also mismatches here
+        return CURRENT;
+    }
+
+    static bool updateAvailable() { return standing() == OUTDATED; }
+
+    // "calandria-0.7.0" -> "0.7.0"; nullptr for any other tag
+    static const char *semverOf(const char *t)
+    {
+        static const char prefix[] = "calandria-";
+        return strncmp(t, prefix, sizeof(prefix) - 1) == 0 ? t + sizeof(prefix) - 1 : nullptr;
+    }
+
+    // "1.2.3" exactly: three numbers, nothing after
+    static bool parseVersion(const char *s, int v[3])
+    {
+        if (!s)
+            return false;
+        for (int i = 0; i < 3; i++) {
+            if (!isdigit((unsigned char)*s))
+                return false;
+            char *end;
+            const long n = strtol(s, &end, 10);
+            if (n < 0 || n > 9999)
+                return false;
+            v[i] = (int)n;
+            s = end;
+            if (i < 2 && *s++ != '.')
+                return false;
+        }
+        return *s == '\0';
     }
 
     // "calandria-0.6.1" -> "0.6.1"; old scheme "v2.8.3-ws154.5" -> "ws154.5"
@@ -169,9 +216,11 @@ class CalandriaBeacon : public SinglePortModule, private concurrency::OSThread
             return;
         strcpy(CalandriaLatest::tag, tag);
         strcpy(CalandriaLatest::commit, commit);
-        const bool update = CalandriaLatest::updateAvailable();
-        LOG_INFO("CalandriaBeacon: latest %s (%s), ours %s: %s", tag, commit, CalandriaLatest::ownHash(),
-                 update ? "update available" : "up to date");
+        const CalandriaLatest::Standing st = CalandriaLatest::standing();
+        const bool update = st == CalandriaLatest::OUTDATED;
+        static const char *const names[] = {"unknown", "update available", "up to date", "newer than the release"};
+        LOG_INFO("CalandriaBeacon: latest %s (%s), ours %s (%s): %s", tag, commit, CALANDRIA_VERSION, CalandriaLatest::ownHash(),
+                 names[st]);
 #ifdef MESHTASTIC_INCLUDE_INKHUD
         if (update && !updateNotified) {
             updateNotified = true;

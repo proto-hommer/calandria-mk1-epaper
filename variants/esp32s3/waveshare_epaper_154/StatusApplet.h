@@ -418,7 +418,7 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         if (airTime)
             s += fmt("%.0f/%.1f", airTime->channelUtilizationPercent(), airTime->utilizationTXPercent());
         s += haveSensor ? fmt("%.1f/%.0f", tempC, humidity) : std::string("x");
-        s += CalandriaLatest::updateAvailable() ? CalandriaLatest::versionLabel() : std::string("");
+        s += std::to_string(CalandriaLatest::standing()) + CalandriaLatest::versionLabel();
         s += getValidTime(RTCQuality::RTCQualityDevice) ? getTimeString() : std::string("");
         return s;
     }
@@ -453,11 +453,16 @@ class StatusApplet : public CalandriaUI<Applet>, public SinglePortModule, public
         drawBox(x0, y1, bw, bh, "Ambiente", haveSensor ? parse(fmt("%.1f°C", tempC)) : std::string("--"),
                 haveSensor ? fmt("humedad %.0f%%", humidity) : std::string("sin sensor"));
 
-        const bool update = CalandriaLatest::updateAvailable();
-        const bool known = CalandriaLatest::tag[0] != '\0';
-        drawBox(x1, y1, bw, bh, "Firmware", CALANDRIA_VERSION,
-                update ? std::string("hay ") + CalandriaLatest::versionLabel() : known ? parse("al día") : std::string(""));
-        if (!update && known)
+        const CalandriaLatest::Standing st = CalandriaLatest::standing();
+        std::string fwSub;
+        if (st == CalandriaLatest::OUTDATED)
+            fwSub = std::string("hay ") + CalandriaLatest::versionLabel();
+        else if (st == CalandriaLatest::CURRENT)
+            fwSub = parse("al día");
+        else if (st == CalandriaLatest::AHEAD)
+            fwSub = "de prueba"; // newer than the published release
+        drawBox(x1, y1, bw, bh, "Firmware", CALANDRIA_VERSION, fwSub);
+        if (st == CalandriaLatest::CURRENT)
             drawCheck(x1 + 8 + textWidthMedium(CALANDRIA_VERSION), y1 + valueMid, BLACK);
 
         static const char *const labels[4] = {"Ajustes", "WiFi", "Bluetooth · PIN", "Apagar"};
