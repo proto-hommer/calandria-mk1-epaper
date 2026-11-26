@@ -8,15 +8,13 @@
 
 InkHUD applet: a scrollable, selectable list of mesh nodes.
 
-Encoder has a single axis, so this uses InkHUD's grab/release pattern (same as the
-UserAppletInputExample): encoder short-press enters "browse" mode. While browsing, turning
-moves the cursor and short-press opens the node's card: details (hops, SNR, last heard, distance
-and direction) and four actions: "Mensaje directo" (keyboard, handed off to MenuApplet::composeTo),
-"Medir senal" (traceroute via the Estado applet, which is then shown with the result), "Radar"
-(the Radar applet locked onto this node: arrow + distance) and "Olvidar nodo" (removed from the
-NodeDB without a reboot, after a second press to confirm). BOOT (EXIT) or encoder
-long-press goes back one level: card -> list -> normal applet navigation. While not
-browsing, turning changes applet as usual, so you are never trapped in the list.
+Opened from Inicio > NODOS, it is browsable right away: turning moves the cursor and short-press opens
+the node's card: details (hops, SNR, last heard, distance and direction) and four actions: "Mensaje
+directo" (keyboard, handed off to MenuApplet::composeTo), "Medir senal" (traceroute via the Estado
+applet, which is then shown with the result), "Radar" (the Radar applet locked onto this node: arrow +
+distance) and "Olvidar nodo" (removed from the NodeDB without a reboot, after a second press to
+confirm). BOOT (EXIT) or encoder long-press closes the card; from the list they reach InkHudNavigator,
+which goes back to the NODOS card.
 
 The list is rebuilt from NodeDB every NODE_PICKER_REFRESH_MS (default 2 min) while the applet is
 on screen, keeping the cursor on the same node. It only redraws if the list actually changed.
@@ -61,8 +59,8 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
 
     void onForeground() override
     {
-        setGrabbed(false);
-        card = false;
+        setCard(false);
+        setGrabbed(true);
         rebuild();
         cursor = 0;
         scrollOffset = 0;
@@ -75,7 +73,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         if (nodeDB->getNumMeshNodes() != builtFrom) { // nodes forgotten from the menu ("Limpiar fantasmas")
             rebuild();
             if (card && cursor < nodes.size() && !nodeDB->getMeshNode(nodes[cursor]))
-                card = false;
+                setCard(false);
         }
         if (card && cursor < nodes.size()) {
             renderCard(nodes[cursor]);
@@ -134,7 +132,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         if (card) {
             runAction();
         } else if (grabbed && cursor < nodes.size()) {
-            card = true;
+            setCard(true);
             action = 0;
             notice.clear();
             requestUpdate(EInk::UpdateTypes::FULL); // whole screen changes
@@ -219,21 +217,20 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     uint16_t scrollOffset = 0;
     bool grabbed = false;
 
-    // Short-press is always ours (enter list / DM). Nav, long-press and EXIT only while browsing,
-    // so outside the list turning changes applet and BOOT/long-press keep their InkHUD roles.
+    // Short-press is always ours (open card / run action), nav while on screen. Long-press and EXIT
+    // only on the card: from the list they belong to InkHudNavigator (back to the NODOS card).
     void setGrabbed(bool g)
     {
         grabbed = g;
         setInputsSubscribed(BUTTON_SHORT, true);
-        setInputsSubscribed(NAV_UP | NAV_DOWN | BUTTON_LONG | EXIT_SHORT, g);
+        setInputsSubscribed(NAV_UP | NAV_DOWN, g);
+        setInputsSubscribed(BUTTON_LONG | EXIT_SHORT, g && card);
     }
 
-    void leaveList()
+    void setCard(bool c)
     {
-        if (!grabbed)
-            return;
-        setGrabbed(false);
-        requestUpdate(EInk::UpdateTypes::FULL); // clear any ghosting left by the list
+        card = c;
+        setGrabbed(grabbed);
     }
 
     // ---------- Node card ----------
@@ -243,15 +240,13 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
     static constexpr uint8_t ACTIONS = 4;
     size_t builtFrom = 0; // NodeDB size the list was built from
 
-    // Card -> list -> out of the list
+    // Card -> list (from the list, BOOT is the navigator's)
     void back()
     {
-        if (card) {
-            card = false;
-            requestUpdate(EInk::UpdateTypes::FULL);
-        } else {
-            leaveList();
-        }
+        if (!card)
+            return;
+        setCard(false);
+        requestUpdate(EInk::UpdateTypes::FULL);
     }
 
     void moveAction(int dir)
@@ -289,7 +284,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             notice = "Activá Radar en el menú";
         else {
             radar->setTarget(num);
-            card = false;
+            setCard(false);
             setGrabbed(false);
             inkhud->showApplet(index);
             return;
@@ -307,7 +302,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             return;
         }
         nodeDB->removeNodeByNum(num);
-        card = false;
+        setCard(false);
         notice.clear();
         rebuild();
         requestUpdate(EInk::UpdateTypes::FULL);
@@ -319,7 +314,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
         if (cursor >= nodes.size())
             return;
         if (action == 0) {
-            card = false;
+            setCard(false);
             compose();
             return;
         }
@@ -339,7 +334,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             notice = "Espera " + std::to_string(wait) + "s";
         } else if (st->traceTo(nodes[cursor])) {
             if (st->isActive()) {
-                card = false;
+                setCard(false);
                 setGrabbed(false);
                 inkhud->showApplet(index); // the result appears there
                 return;
@@ -464,7 +459,7 @@ class NodePickerApplet : public Applet, public concurrency::OSThread
             if (isActive(n))
                 active++;
         char buf[32];
-        snprintf(buf, sizeof(buf), "Nodes%s %u (%u act)", grabbed ? " *" : "", (unsigned)nodes.size(), (unsigned)active);
+        snprintf(buf, sizeof(buf), "Nodes %u (%u act)", (unsigned)nodes.size(), (unsigned)active);
         return buf;
     }
 

@@ -11,13 +11,14 @@ InkHUD applet: the stock Waypoints list, plus "pick one -> compass" for a single
 Subclasses WaypointListApplet so it keeps the same slot in the applet list (saved settings are by
 index) and the menu's "Remove Waypoint" page keeps working (asWaypointListApplet()).
 
-Three levels:
-  LIST    : stock list, untouched. Turning changes applet (we drop the base's NAV grab).
-  PICK    : "Waypoints *": turning moves a cursor, encoder short opens the compass.
+Opened from Inicio > RUMBO:
+  PICK    : the waypoints with a cursor (turning moves it), encoder short opens the compass.
+  LIST    : the stock list, only while there are no waypoints (its "no waypoints" screen).
   COMPASS : arrow to the waypoint, NORTH UP (no magnetometer: we know the bearing to the target,
             never which way the user faces). Distance + bearing in degrees.
             Encoder short = re-measure now (full refresh). Entering re-measures too.
-BOOT short or encoder long goes back one level.
+BOOT short or encoder long closes the compass; from PICK / LIST they reach InkHudNavigator, which goes
+back to the RUMBO card.
 
 */
 
@@ -42,13 +43,14 @@ class WaypointCompassApplet : public WaypointListApplet
     void onActivate() override
     {
         WaypointListApplet::onActivate();
-        setLevel(LIST);
+        setLevel(topLevel());
     }
 
     void onForeground() override
     {
         WaypointListApplet::onForeground();
-        setLevel(LIST);
+        cursor = 0;
+        setLevel(topLevel());
     }
 
     void onRender(bool full) override
@@ -59,7 +61,7 @@ class WaypointCompassApplet : public WaypointListApplet
         }
         const StoredWaypoint *wp = selected();
         if (!wp) { // waypoint list changed under us (expired / deleted)
-            level = LIST;
+            setLevel(LIST);
             WaypointListApplet::onRender(full);
             return;
         }
@@ -133,21 +135,23 @@ class WaypointCompassApplet : public WaypointListApplet
     uint16_t cursor = 0;
     uint16_t scroll = 0;
 
-    // Short press is always ours (enter / select / re-measure). Nav, long press and EXIT only
-    // below LIST, so on the stock list turning changes applet and BOOT opens the menu.
+    Level topLevel() { return waypointStore.getWaypoints().empty() ? LIST : PICK; }
+
+    // Short press is always ours (enter / select / re-measure), nav while picking. Long press and
+    // EXIT only on the compass: from PICK / LIST they belong to InkHudNavigator (back to RUMBO).
     void setLevel(Level l)
     {
         level = l;
         setInputsSubscribed(BUTTON_SHORT, true);
-        setInputsSubscribed(BUTTON_LONG | EXIT_SHORT, l != LIST);
+        setInputsSubscribed(BUTTON_LONG | EXIT_SHORT, l == COMPASS);
         setInputsSubscribed(NAV_UP | NAV_DOWN, l == PICK);
     }
 
     void back()
     {
-        if (level == LIST)
+        if (level != COMPASS)
             return;
-        setLevel(level == COMPASS ? PICK : LIST);
+        setLevel(PICK);
         requestUpdate(EInk::UpdateTypes::FAST);
     }
 
@@ -180,7 +184,7 @@ class WaypointCompassApplet : public WaypointListApplet
     {
         const auto &wps = waypointStore.getWaypoints();
         setFont(fontSmall);
-        drawHeader("Waypoints *");
+        drawHeader("Waypoints");
 
         const int16_t top = getHeaderHeight() + 2;
         const uint16_t rowH = fontSmall.lineHeight() + 2;

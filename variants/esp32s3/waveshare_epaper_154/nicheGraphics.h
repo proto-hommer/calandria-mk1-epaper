@@ -23,6 +23,7 @@
 #include "AppletNames.h"
 #include "DeliveryWatcher.h"
 #include "EncoderInput.h"
+#include "HubApplet.h"
 #include "NodePickerApplet.h"
 #include "RadarApplet.h"
 #include "StatusApplet.h"
@@ -95,29 +96,31 @@ static void migrateAppletSettings(NicheGraphics::InkHUD::InkHUD *inkhud)
     FlashData<VariantState>::save(&state, "wsepd154");
 }
 
-// Heard and Recents List duplicate "Nodes" (same nodes, same order, less info). The one-time v1
-// migration hid them, but they can come back (menu, or a settings reset back to the defaults), so
-// keep them off on every boot. They stay registered: removing them would shift the saved indexes.
-static void hideRedundantApplets(NicheGraphics::InkHUD::InkHUD *inkhud)
+// Two-level navigation (HubApplet: Inicio -> card -> applet), enforced on every boot because the
+// menu (or a settings reset) can change it:
+//  - one tile showing Inicio at boot: Inicio, its cards and BOOT-to-go-back assume a single tile;
+//  - everything the cards open is active (a switched-off applet would be a dead end);
+//  - Heard, Recents List and Favorites Map are off: Nodes and Positions already show the same.
+//    They stay registered: removing them would shift the saved indexes.
+static void arrangeForHub(NicheGraphics::InkHUD::InkHUD *inkhud)
 {
     using namespace NicheGraphics;
     auto &s = inkhud->persistence->settings;
-    int nodes = -1;
-    for (size_t i = 0; i < inkhud->userApplets.size(); i++)
-        if (inkhud->userApplets[i]->name && strcmp(inkhud->userApplets[i]->name, AppletNames::NODES) == 0)
-            nodes = (int)i;
+    s.userTiles.maxCount = 1; // also hides "Layout" from the menu
+    s.userTiles.count = 1;
+    s.userTiles.focused = 0;
     for (size_t i = 0; i < inkhud->userApplets.size(); i++) {
         const char *n = inkhud->userApplets[i]->name;
-        if (!n || (strcmp(n, AppletNames::HEARD) != 0 && strcmp(n, AppletNames::RECENTS) != 0))
+        if (!n)
             continue;
-        s.userApplets.active[i] = false;
-        s.userApplets.autoshow[i] = false;
-        for (uint8_t &shown : s.userTiles.displayedUserApplet)
-            if (shown == i && nodes >= 0)
-                shown = (uint8_t)nodes;
+        const bool off = !strcmp(n, AppletNames::HEARD) || !strcmp(n, AppletNames::RECENTS) ||
+                         !strcmp(n, AppletNames::FAVORITES_MAP);
+        s.userApplets.active[i] = !off;
+        if (off)
+            s.userApplets.autoshow[i] = false;
+        if (!strcmp(n, AppletNames::HOME))
+            s.userTiles.displayedUserApplet[0] = (uint8_t)i;
     }
-    if (nodes >= 0)
-        s.userApplets.active[nodes] = true;
 }
 
 void setupNicheGraphics()
@@ -148,9 +151,9 @@ void setupNicheGraphics()
     // One encoder axis: the on-screen keyboard steps through keys linearly instead of 2D.
     inkhud->singleAxisKeyboard = true;
 
-    inkhud->persistence->settings.userTiles.maxCount = 2;
+    inkhud->persistence->settings.userTiles.maxCount = 1; // Inicio needs one tile (arrangeForHub)
     inkhud->persistence->settings.optionalFeatures.batteryIcon = true;
-    // BOOT long already switches tile (like the joystick boards): keep the menu one item shorter
+    // One tile only (BOOT long goes to Inicio): "Next Tile" has nothing to do
     inkhud->persistence->settings.optionalMenuItems.nextTile = false;
 
     // ORDER MATTERS: saved settings (active / autoshow / tile assignment) are stored by applet
@@ -168,6 +171,7 @@ void setupNicheGraphics()
     inkhud->addApplet(AppletNames::NODES, new InkHUD::NodePickerApplet, true); // index 9 (added with the encoder)
     inkhud->addApplet(AppletNames::POSITIONS, new InkHUD::PositionsApplet, true); // index 10: map of all nodes
     inkhud->addApplet(AppletNames::STATUS, new InkHUD::StatusApplet, true);       // index 11: sensors / battery / radio / GPS
+    inkhud->addApplet(AppletNames::HOME, new InkHUD::HubApplet, true);            // index 12: Inicio, the 4 cards
 
     // Physical CardKB (I2C 0x5F, on the touch connector's SDA/SCL), like the Wio Tracker L1.
     // Found by the boot I2C scan; with it attached the on-screen keyboard is never shown.
@@ -186,7 +190,7 @@ void setupNicheGraphics()
         inkhud->persistence->saveSettings();
     }
     migrateAppletSettings(inkhud);
-    hideRedundantApplets(inkhud);
+    arrangeForHub(inkhud);
 
     inkhud->begin();
 

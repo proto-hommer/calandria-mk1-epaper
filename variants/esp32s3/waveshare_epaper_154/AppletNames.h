@@ -19,4 +19,5 @@ constexpr const char *HEARD = "Heard";
 constexpr const char *NODES = "Nodes";
 constexpr const char *POSITIONS = "Positions";
 constexpr const char *STATUS = "Estado";
+constexpr const char *HOME = "Inicio";
 } // namespace NicheGraphics::AppletNames
