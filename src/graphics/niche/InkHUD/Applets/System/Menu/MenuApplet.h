@@ -72,6 +72,14 @@ class MenuApplet : public SystemApplet, public concurrency::OSThread
     void drawSystemInfoPanel(int16_t left, int16_t top, uint16_t width,
                              uint16_t *height = nullptr);                   // Info panel at top of root menu
     void sendText(NodeNum dest, ChannelIndex channel, const char *message); // Send a text message to mesh
+
+  public:
+    // Optional: told about every text message the menu sends, right before it goes out (with its real
+    // packet id). A DM sent by the node is never looped back to the modules, so this is how a variant
+    // can keep its own sent DMs. nullptr by default.
+    static inline void (*onTextSent)(const meshtastic_MeshPacket &p) = nullptr;
+
+  protected:
     void freeCannedMessageResources();                                      // Clear MenuApplet's canned message processing data
 
     MenuPage startPageOverride = MenuPage::ROOT;

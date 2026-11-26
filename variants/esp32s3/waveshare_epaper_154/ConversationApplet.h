@@ -22,7 +22,10 @@ Messages come from the global MessageStore. Gaps of the stock InkHUD are filled 
   - channel messages (incoming and ours) are stored by ThreadedMessageApplet, but only while that
     applet is active (and there is one for channels 0 and 1 only). We store them whenever no active
     ThreadedMessageApplet does it for that channel: each message ends up in the store exactly once;
-  - our own DMs (sent from the node or the phone) are stored: the stock code only stores incoming ones;
+  - our own DMs sent from the node are stored when they are sent (recordSent: from our canned replies and,
+    through MenuApplet::onTextSent, from the keyboard). Router::sendLocal() loops back broadcasts only,
+    so a DM never reaches handleReceived(); if one ever does, its packet id is already known and it is
+    not stored twice. DMs sent from the phone are not seen by the node's UI at all;
   - the routing ACKs of what we sent mark it delivered / relayed / failed.
 Reactions (a reply carrying an emoji) are stored as plain messages: the emoji, or "(emoji)" when the
 font lacks it.
@@ -67,7 +70,11 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     ConversationApplet() : MeshModule("ConversationApplet")
     {
         instance = this;
-        loopbackOk = true; // our own sends and the ACKs our router raises arrive as local packets
+        loopbackOk = true; // our own broadcasts and the ACKs our router raises arrive as local packets
+        MenuApplet::onTextSent = [](const meshtastic_MeshPacket &p) {
+            if (instance)
+                instance->recordSent(p);
+        };
     }
 
     static ConversationApplet *get() { return instance; }
@@ -114,8 +121,11 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
             if (cursor >= convs.size())
                 return;
             open = convs[cursor];
+            openedUnread = unreadOf(open);
             markRead(open);
             buildThread();
+            LOG_INFO("Mensajes: open %s 0x%08x, %u in thread, %u unread, store %u", open.dm ? "DM" : "channel",
+                     (unsigned)open.id, (unsigned)thread.size(), openedUnread, (unsigned)messageStore.getLiveMessages().size());
             msgCursor = thread.empty() ? 0 : thread.size() - 1;
             threadTop = 0;
             setLevel(THREAD);
@@ -161,6 +171,8 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         if (mp.decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
             if (mp.to == NODENUM_BROADCAST)
                 storeChannelMessage(mp);
+            else if (isFromUs(&mp) && !isRecorded(mp.id))
+                recordSent(mp); // a DM looped back (does not happen today): store it once
             if (isFromUs(&mp))
                 noteSent(mp);
         } else
@@ -195,6 +207,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     uint16_t replyCursor = 0, replyTop = 0; // REPLY
     std::string notice;
     std::vector<Sent> sent;
+    uint16_t openedUnread = 0; // unread when the conversation was opened (some may be gone from the store)
 
     void setLevel(Level l)
     {
@@ -211,6 +224,15 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         Conv c;
         c.dm = p->to != NODENUM_BROADCAST;
         c.id = c.dm ? p->from : p->channel;
+        if (c.dm) { // is it in the store? (other observers, InkHUD::Events, store incoming DMs)
+            size_t found = 0;
+            const NodeNum me = nodeDB->getNodeNum();
+            for (const StoredMessage &m : messageStore.getLiveMessages())
+                found += belongs(m, c, me);
+            LOG_INFO("Mensajes: DM from 0x%08x to 0x%08x ch %u pki %d; store %u msgs, %u in this conversation", p->from,
+                     p->to, p->channel, (int)p->pki_encrypted, (unsigned)messageStore.getLiveMessages().size(),
+                     (unsigned)found);
+        }
         const bool reading = isForeground() && level != LIST && open == c;
         if (!reading) {
             if (c.dm)
@@ -243,13 +265,32 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
     }
 
     // ---------- Our own messages ----------
+
+    // A text we are sending, with its real packet id, before it goes out: our DMs go into the store here
+    // (nobody else stores them) and every send waits for its ACK in `sent`
+    void recordSent(const meshtastic_MeshPacket &p)
+    {
+        if (isRecorded(p.id))
+            return;
+        const bool dm = p.to != NODENUM_BROADCAST && p.to != 0;
+        if (dm && messageStore.shouldStorePacket(p))
+            if (const StoredMessage *m = messageStore.tryAddFromPacket(p))
+                const_cast<StoredMessage &>(*m).ackStatus = AckStatus::NONE; // until its ACK comes back
+        LOG_INFO("Mensajes: sent id=0x%08x to 0x%08x ch %u%s", p.id, p.to, p.channel, dm ? " (DM, stored)" : "");
+        noteSent(p);
+    }
+
+    bool isRecorded(PacketId id)
+    {
+        return std::any_of(sent.begin(), sent.end(), [id](const Sent &s) { return s.id == id; });
+    }
+
+    // Waits for the ACK of one of ours. Broadcasts reach this through the loopback (stored by
+    // storeChannelMessage / ThreadedMessageApplet); a DM only through recordSent.
     void noteSent(const meshtastic_MeshPacket &mp)
     {
-        const bool dm = mp.to != NODENUM_BROADCAST && mp.to != 0;
-        // Broadcasts are stored by ThreadedMessageApplet; our DMs from the node are not stored by anyone
-        if (dm && messageStore.shouldStorePacket(mp))
-            if (const StoredMessage *m = messageStore.tryAddFromPacket(mp))
-                const_cast<StoredMessage &>(*m).ackStatus = AckStatus::NONE; // until its ACK comes back
+        if (isRecorded(mp.id))
+            return; // already recorded when it was sent
         Sent s;
         s.id = mp.id;
         s.dest = mp.to;
@@ -525,6 +566,8 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         p->decoded.payload.size = std::min<size_t>(strlen(message), sizeof(p->decoded.payload.bytes));
         memcpy(p->decoded.payload.bytes, message, p->decoded.payload.size);
         LOG_INFO("Send message id=%d, dest=%x, msg=%.*s", p->id, p->to, p->decoded.payload.size, p->decoded.payload.bytes);
+        if (instance)
+            instance->recordSent(*p); // DMs are never looped back: keep it now, with its real id
         service->sendToMesh(p, RX_SRC_LOCAL, true); // to the mesh, copy to the phone
     }
 
@@ -573,7 +616,7 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
 
             std::string preview;
             if (!last)
-                preview = "Sin mensajes";
+                preview = parse(unreadHere ? "(mensaje anterior, ya no guardado)" : "Sin mensajes");
             else {
                 const NodeNum me = nodeDB->getNodeNum();
                 std::string who = last->sender == me ? "Vos: " : c.dm ? "" : shortNameOf(last->sender) + ": ";
@@ -607,7 +650,9 @@ class ConversationApplet : public CalandriaUI<Applet>, public MeshModule
         const uint16_t textW = width() - 8;
         if (thread.empty()) {
             setFont(fontSmall);
-            printAt(X(0.5f), Y(0.5f), "Sin mensajes. Clic: escribir", CENTER, MIDDLE);
+            if (openedUnread)
+                printAt(X(0.5f), Y(0.45f), parse("(mensaje anterior, ya no guardado)"), CENTER, MIDDLE);
+            printAt(X(0.5f), Y(0.55f), "Sin mensajes. Clic: escribir", CENTER, MIDDLE);
             return;
         }
 

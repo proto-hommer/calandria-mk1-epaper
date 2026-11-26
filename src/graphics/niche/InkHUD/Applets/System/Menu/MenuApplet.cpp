@@ -3137,6 +3137,8 @@ void InkHUD::MenuApplet::sendText(NodeNum dest, ChannelIndex channel, const char
 
     LOG_INFO("Send message id=%d, dest=%x, msg=%.*s", p->id, p->to, p->decoded.payload.size, p->decoded.payload.bytes);
 
+    if (onTextSent)
+        onTextSent(*p);
     service->sendToMesh(p, RX_SRC_LOCAL, true); // Send to mesh, cc to phone
 }
 
