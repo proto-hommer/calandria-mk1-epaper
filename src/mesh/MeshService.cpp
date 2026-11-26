@@ -436,6 +436,18 @@ ErrorCode MeshService::sendToMesh(meshtastic_MeshPacket *p, RxSource src, bool c
     if (src == RX_SRC_LOCAL && localDelivery)
         ccToPhone = true;
 
+    // The phone's copy is taken BEFORE sending: Router::send() encrypts p in place (and replaces the channel
+    // index with its hash), and a DM encrypted with the destination's public key could never be decoded
+    // back for the phone. After sendLocal() p also belongs to the router's TX queue.
+    meshtastic_MeshPacket *phoneCopy = nullptr;
+    if (ccToPhone) {
+        DEBUG_HEAP_BEFORE;
+        phoneCopy = packetPool.allocCopy(*p);
+        DEBUG_HEAP_AFTER("MeshService::sendToMesh", phoneCopy);
+        if (phoneCopy && phoneCopy->from == 0)
+            phoneCopy->from = nodeDB->getNodeNum();
+    }
+
     // Note: We might return !OK if our fifo was full, at that point the only option we have is to drop it
     ErrorCode res = router->sendLocal(p, src);
 
@@ -451,13 +463,11 @@ ErrorCode MeshService::sendToMesh(meshtastic_MeshPacket *p, RxSource src, bool c
         }
     }
 
-    if ((res == ERRNO_OK || res == ERRNO_SHOULD_RELEASE) && ccToPhone) { // Check if p is not released in case it couldn't be sent
-        DEBUG_HEAP_BEFORE;
-        auto a = packetPool.allocCopy(*p);
-        DEBUG_HEAP_AFTER("MeshService::sendToMesh", a);
-
-        if (a)
-            sendToPhone(a);
+    if (phoneCopy) {
+        if (res == ERRNO_OK || res == ERRNO_SHOULD_RELEASE) // only what actually went out (or was delivered here)
+            sendToPhone(phoneCopy);
+        else
+            packetPool.release(phoneCopy);
     }
 
     // Router may ask us to release the packet if it wasn't sent
