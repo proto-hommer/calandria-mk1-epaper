@@ -172,7 +172,8 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 - Radio LoRa (Wio-SX1262), pantalla e-paper y encoder, probados en la placa.
 - Mensajes de canal y directos, responder, teclado en pantalla y aviso **"No entregado"** con el motivo
-  cuando un mensaje vuelve con error.
+  cuando un mensaje vuelve con error. Los directos se ven igual en el MK1 y en la app conectada, los
+  mande quien los mande, con "entregado".
 - El Inicio con las cuatro carátulas: conversaciones, lista de nodos con ficha y medición de señal
   (traceroute), radar, brújulas, estado y ajustes.
 - La posición propia se recupera al reiniciar, sin esperar al celular.
@@ -182,8 +183,7 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 - **A batería:** que el latch la mantenga prendida al soltar PWR, el apagado completo y el deep sleep.
 - La **lectura de batería**, que no está calibrada contra una medición real.
-- Lo nuevo de la 0.9.0: los **mensajes directos** propios con "entregado", y el **WiFi** con su salida
-  de emergencia.
+- El **WiFi** con su salida de emergencia, **Pedir datos**, **Medir señal** y los **ajustes** de Estado.
 - **GPS:** el módulo todavía no está instalado.
 
 * * *
@@ -361,8 +361,10 @@ aparece solo en pantalla, y BOOT te devuelve a donde estabas.
 Todos los nodos, el último oído arriba, con distancia y rumbo ("1,2 km NO") y saltos. Los
 **perdidos** van tachados: un cliente a la hora sin oírlo, un router a las 13 horas, igual que en
 CalandriApp. Cada nodo abre una **ficha** con cuatro datos (oído, enlace, distancia, batería) y sus
-acciones: **mandarle un mensaje**, **medir señal**, **rastrearlo** con la brújula, **favorito** y
-**olvidarlo**. *Medir señal* manda un traceroute y muestra la **ida** y la **vuelta** con el SNR de
+acciones: **mandarle un mensaje**, **medir señal**, **rastrearlo** con la brújula, **pedir datos**,
+**favorito** y **olvidarlo**. *Pedir datos* sirve cuando un nodo aparece "sin ficha" (sin nombre ni
+clave, y entonces un directo falla con "sin su clave"): le manda nuestra ficha y le pide la suya, como
+mucho una vez por minuto. Si un directo falla por la clave, el aviso lo ofrece con un clic. *Medir señal* manda un traceroute y muestra la **ida** y la **vuelta** con el SNR de
 cada tramo ("VOS -3 dB » BASE -8 dB » JUAN"), cuántos saltos hay y cuál es el tramo más flojo. Al
 final de la lista está el **Radar**: los 10 nodos más cercanos dibujados a escala.
 

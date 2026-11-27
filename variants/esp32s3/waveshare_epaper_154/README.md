@@ -208,14 +208,20 @@ reads "al día" (up to date), "hay X.Y.Z" when a newer release is out (the app t
 prueba" when the node runs something newer than the published release. The clock switches to the
 phone's timezone right away, with no reboot.
 
-### What's new in 0.9.0
+### What's new in 0.9
 
-- **Direct messages:** the ones you send from the MK1 (canned reply or keyboard) show in the
+- **0.9.3, Pedir datos (ask for its details):** a node "sin ficha" (no name or key) can be asked for its
+  NodeInfo from its card, and the "sin su clave" pop-up offers it with one click.
+- **0.9.2:** what you send from the MK1 also shows in the connected app.
+- **0.9.1:** DMs you send from the app show on the MK1.
+- **0.9.0, direct messages:** the ones you send from the MK1 (canned reply or keyboard) show in the
   conversation and go from "enviando" (sending) to "entregado" (delivered), or "no entregado", with
   the ACK. The history keeps 50 messages instead of 20, so a busy channel no longer pushes DMs out.
-- **WiFi:** switched on and off from *ESTADO → WiFi*, with an emergency way out (see [WiFi](#wifi)).
+- **0.9.0, WiFi:** switched on and off from *ESTADO → WiFi*, with an emergency way out (see
+  [WiFi](#wifi)).
 
-0.7.0 brought the card navigation, and 0.8.0 fixes on top of it.
+0.7.0 brought the card navigation, and 0.8.0 fixes on top of it. Each one is detailed on the
+[Releases](https://github.com/proto-hommer/calandria-mk1-epaper/releases) page.
 
 ## Flashing a prebuilt release
 
@@ -276,7 +282,9 @@ needed to move around. BOOT alone only reaches the InkHUD menu.
 - **NODOS (nodes):** every node, last heard first, with distance, direction and hops. Lost nodes
   are struck through (1 h unheard; 13 h for ROUTERs). At the end, the **Radar** with the 10
   nearest. Each node's card has *message*, *Medir señal* (traceroute: there and back with the SNR of
-  every hop and the weakest one), *track it* (compass), *favorite* and *forget*.
+  every hop and the weakest one), *track it* (compass), *Pedir datos* (ask for its details),
+  *favorite* and *forget*. A node "sin ficha" (no name or key, so a DM to it fails with "sin su clave")
+  shows its ID; *Pedir datos* sends it our NodeInfo and asks for its own, at most once a minute.
 - **RUMBO (heading):** track a node, waypoints (nearest first), the group map and your own
   position. The compass is **north-up**: the board has no magnetometer, so it cannot know which way
   you are facing. Your position comes from the phone over Bluetooth.
@@ -313,9 +321,9 @@ until the firmware takes over. To power off, hold PWR for 3 seconds or use *ESTA
 ## Status
 
 Working and in daily use: radio, e-paper, InkHUD, the BOOT button, the rotary encoder, Inicio with
-its cards and channel messages.
+its cards, and channel and direct messages (on the MK1 and in the connected app).
 
-Not yet tested on the board: the 0.9.0 direct messages and WiFi.
+Not yet tested on the board: WiFi, *Pedir datos*, *Medir señal* and the settings pages.
 
 Not yet fully verified:
 

@@ -97,14 +97,20 @@ dice "al día", "hay X.Y.Z" cuando hay un release más nuevo (se lo dice la app)
 nodo tiene una versión más nueva que la publicada. La hora pasa a la zona horaria del celular
 enseguida, sin reiniciar.
 
-### Lo nuevo de la 0.9.0
+### Lo nuevo de la 0.9
 
-- **Mensajes directos:** los que mandás desde el MK1 (respuesta rápida o teclado) se ven en la
+- **0.9.3, Pedir datos:** a un nodo "sin ficha" (sin nombre ni clave) se le pide la ficha desde la
+  suya, y el aviso de "sin su clave" lo ofrece con un clic.
+- **0.9.2:** lo que mandás desde el MK1 aparece también en la app conectada.
+- **0.9.1:** los directos que mandás desde la app aparecen en el MK1.
+- **0.9.0, mensajes directos:** los que mandás desde el MK1 (respuesta rápida o teclado) se ven en la
   conversación y pasan de "enviando" a "entregado" (o "no entregado") con el ACK. El historial guarda
   50 mensajes en vez de 20, así un canal con mucho tráfico no se lleva los directos.
-- **WiFi:** se prende y se apaga desde *ESTADO → WiFi*, con salida de emergencia (ver [WiFi](#wifi)).
+- **0.9.0, WiFi:** se prende y se apaga desde *ESTADO → WiFi*, con salida de emergencia (ver
+  [WiFi](#wifi)).
 
-La 0.7.0 trajo la navegación por carátulas, y la 0.8.0, arreglos sobre ella.
+La 0.7.0 trajo la navegación por carátulas, y la 0.8.0, arreglos sobre ella. El detalle de cada una
+está en [Releases](https://github.com/proto-hommer/calandria-mk1-epaper/releases).
 
 ## Flashear un release ya compilado
 
@@ -166,7 +172,9 @@ el encoder para moverse. Solo con BOOT se llega al menú de InkHUD.
 - **NODOS:** todos los nodos, el último oído arriba, con distancia, rumbo y saltos. Los perdidos
   van tachados (1 h sin oírlos; 13 h si son ROUTER). Al final, el **Radar** con los 10 más cerca.
   La ficha de cada nodo tiene *Mandarle un mensaje*, *Medir señal* (traceroute: ida y vuelta con el
-  SNR de cada tramo y el más flojo), *Rastrearlo* (brújula), *Marcar favorito* y *Olvidar nodo*.
+  SNR de cada tramo y el más flojo), *Rastrearlo* (brújula), *Pedir datos*, *Marcar favorito* y *Olvidar nodo*.
+  Un nodo "sin ficha" (sin nombre ni clave, y entonces un directo falla con "sin su clave") aparece con
+  su ID; *Pedir datos* le manda nuestra ficha y le pide la suya, como mucho una vez por minuto.
 - **RUMBO:** *Rastrear un nodo*, *Waypoints* (del más cerca al más lejos), *Mapa del grupo* y
   *Mi posición*. La brújula va **con el norte arriba**: la placa no tiene magnetómetro, así que no
   puede saber hacia dónde mirás. Tu posición la toma del celular por Bluetooth.
@@ -206,9 +214,9 @@ segundos o usá *ESTADO → Apagar*. Con el USB enchufado anda siempre.
 ## Estado
 
 Funcionando y en uso diario: radio, e-paper, InkHUD, botón BOOT, encoder, el Inicio con las
-carátulas y los mensajes de canal.
+carátulas, y los mensajes de canal y directos (en el MK1 y en la app conectada).
 
-Sin probar en la placa todavía: los mensajes directos de la 0.9.0 y el WiFi.
+Sin probar en la placa todavía: el WiFi, *Pedir datos*, *Medir señal* y los ajustes.
 
 Sin verificar del todo:
 
