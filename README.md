@@ -1,9 +1,9 @@
-<p align="center"><img src="variants/esp32s3/waveshare_epaper_154/img/readme/banner.png" alt="Calandria MK1: e-paper, LoRa, Meshtastic. Alpha, en desarrollo" width="100%"/></p>
+<p align="center"><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/banner.png" alt="Calandria MK1: e-paper, LoRa, Meshtastic. Alpha, en desarrollo" width="100%"/></p>
 
 **Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa
 de Seeed cableado a mano. Es el complemento de hardware de [CalandriApp](https://github.com/proto-hommer/calandriapp).**
 
-Versión [![Calandria](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=calandria&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
+Versión [![Calandria](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=calandria&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/calandria_mk1_epaper/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/calandria_mk1_epaper/README.md)*
 
 [![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
 ![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-ff7a2f)
@@ -19,21 +19,21 @@ qué es Meshtastic, qué es el MK1 y qué te hace falta para armarlo, y por qué
 > todo. Puede cambiar cualquier cosa de una versión a otra.
 
 <p align="center">
-  <img src="variants/esp32s3/waveshare_epaper_154/img/nodes.jpg" alt="Lista de nodos en el e-paper" width="45%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/nodes.jpg" alt="Lista de nodos en el e-paper" width="45%"/>
   &nbsp;
-  <img src="variants/esp32s3/waveshare_epaper_154/img/radar.jpg" alt="Radar apuntando a un nodo a 2 km" width="45%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/radar.jpg" alt="Radar apuntando a un nodo a 2 km" width="45%"/>
 </p>
 <p align="center"><i>Izquierda: la lista de nodos (42 conocidos, 9 activos). Derecha: el radar apuntando a un nodo a 2 km. A la derecha de la caja, el encoder.</i></p>
 
 * * *
 
 <a id="si-recien-llegas"></a>
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/si-recien-llegas.png" alt="Si recién llegás" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/si-recien-llegas.png" alt="Si recién llegás" width="100%"/></p>
 
 Si nunca oíste hablar de LoRa ni de Meshtastic, empezá por acá: en cinco minutos sabés qué es todo
 esto, qué es el MK1 y qué te hace falta.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-idea.png" alt="La idea" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-la-idea.png" alt="La idea" height="26"/></p>
 
 Unos aparatos de radio chiquitos llamados **nodos**, que se pasan mensajes de texto y posiciones entre
 ellos **sin internet, sin señal de celular y sin pagar abono**. Sirven para salidas al campo o a la
@@ -41,7 +41,7 @@ montaña, para coordinar un grupo donde no hay señal, o para cuando se corta to
 es uno de esos nodos, de bolsillo y con pantalla: se puede usar solo, con la perilla, o desde el celular
 con [CalandriApp](https://github.com/proto-hommer/calandriapp).
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-lora.png" alt="Qué es LoRa" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-que-es-lora.png" alt="Qué es LoRa" height="26"/></p>
 
 **LoRa** (de *Long Range*, "largo alcance") es una forma de transmitir por radio pensada para mandar
 **pocos datos muy lejos, gastando muy poca batería**. Pensalo como un walkie-talkie que, en vez de voz,
@@ -56,7 +56,7 @@ manda mensajes de texto:
 
 En el MK1, la radio LoRa es el **Seeed Wio-SX1262** que va cableado a la placa (ver [Cableado](#cableado)).
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-una-red-mesh.png" alt="Qué es una red mesh" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-que-es-una-red-mesh.png" alt="Qué es una red mesh" height="26"/></p>
 
 *Mesh* quiere decir malla. En una red mesh no hay una antena central ni una empresa en el medio:
 **cada nodo repite lo que oye**, y así un mensaje va saltando de uno a otro hasta llegar.
@@ -69,7 +69,7 @@ En el MK1, la radio LoRa es el **Seeed Wio-SX1262** que va cableado a la placa (
   **repetidor**) ayuda a todos los que lo oyen.
 - Si un nodo se apaga, los demás siguen repitiendo: no hay un punto único que corte todo.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-meshtastic.png" alt="Qué es Meshtastic" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-que-es-meshtastic.png" alt="Qué es Meshtastic" height="26"/></p>
 
 [Meshtastic](https://meshtastic.org) es un proyecto libre y gratuito que convierte placas LoRa baratas
 en nodos de una red mesh. Tiene tres partes: **el firmware** (el programa que corre adentro del nodo;
@@ -80,7 +80,7 @@ sean) y **las apps** que hablan con el nodo (la oficial y otras, como CalandriAp
 **Meshtastic no trae soporte para la placa del MK1**, y por eso existe este repo: es el firmware de
 Meshtastic con una variante propia para esta placa y una interfaz para manejarla con la perilla.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-te-hace-falta.png" alt="Qué te hace falta" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-que-te-hace-falta.png" alt="Qué te hace falta" height="26"/></p>
 
 1. **Las piezas** de [Hardware](#hardware): la placa Waveshare ESP32-S3-ePaper-1.54, el módulo Seeed
    Wio-SX1262 con su antena, el encoder y cables. Hay que **soldar** unos pocos cables
@@ -95,7 +95,7 @@ Meshtastic con una variante propia para esta placa y una interfaz para manejarla
 5. Para hablar con otros, que **ellos también tengan un nodo** Meshtastic (cualquiera, no hace falta
    que sea un MK1) y estén en el mismo grupo.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-palabras-que-vas-a-ver.png" alt="Palabras que vas a ver" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-palabras-que-vas-a-ver.png" alt="Palabras que vas a ver" height="26"/></p>
 
 | Palabra | Qué quiere decir |
 |---|---|
@@ -111,7 +111,7 @@ Meshtastic con una variante propia para esta placa y una interfaz para manejarla
 | **Encoder** | La perilla: se gira para moverse y se aprieta para elegir. |
 | **Alpha** | Prototipo en desarrollo: anda, pero puede cambiar cualquier cosa. |
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-familia-calandria-y-sus-versiones.png" alt="La familia Calandria y sus versiones" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-la-familia-calandria-y-sus-versiones.png" alt="La familia Calandria y sus versiones" height="26"/></p>
 
 Calandria son varios proyectos que se usan juntos, pero cada uno anda solo y va a su ritmo:
 
@@ -131,11 +131,11 @@ su número.
 Se numera **X.Y.Z**: **Z** sube con los arreglos, **Y** con funciones nuevas y **X** con un cambio
 grande. El MK1 va por la **0.x** porque todavía es **alpha**: llega a 1.0 cuando tenga GPS, batería y
 carcasa. Para actualizarlo, el Calandria Flasher. El detalle de cada versión está en
-[versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones).
+[versiones](variants/esp32s3/calandria_mk1_epaper/README.es.md#versiones).
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/que-es-esto.png" alt="Qué es esto" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/que-es-esto.png" alt="Qué es esto" width="100%"/></p>
 
 Meshtastic no trae soporte para la **Waveshare ESP32-S3-ePaper-1.54**. Esta placa tiene ESP32-S3,
 pantalla e-paper, RTC, sensor de temperatura y cargador de batería, pero no tiene radio LoRa.
@@ -147,7 +147,7 @@ con una brújula y ves en un radar quién tenés cerca.
 Todo corre sobre **InkHUD**, la interfaz de Meshtastic para pantallas e-paper. La pantalla se lee a
 pleno sol y no gasta energía mientras no cambia.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-con-calandriapp.png" alt="Con CalandriApp" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-con-calandriapp.png" alt="Con CalandriApp" height="26"/></p>
 
 El Calandria MK1 funciona solo, pero está pensado para ir junto con [CalandriApp](https://github.com/proto-hommer/calandriapp),
 la app Android del proyecto. Como el nodo **todavía no tiene GPS**, el celular le pasa su posición
@@ -164,11 +164,11 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/estado-del-proyecto.png" alt="Estado del proyecto" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/estado-del-proyecto.png" alt="Estado del proyecto" width="100%"/></p>
 
 **Alpha.** Se usa de verdad, pero es un prototipo en desarrollo.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-lo-que-anda.png" alt="Lo que anda" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-lo-que-anda.png" alt="Lo que anda" height="26"/></p>
 
 - Radio LoRa (Wio-SX1262), pantalla e-paper y encoder, probados en la placa.
 - Mensajes de canal y directos, responder, teclado en pantalla y aviso **"No entregado"** con el motivo
@@ -179,7 +179,7 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 - La posición propia se recupera al reiniciar, sin esperar al celular.
 - Anuncio de identidad para CalandriApp.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-lo-que-falta-probar.png" alt="Lo que falta probar" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-lo-que-falta-probar.png" alt="Lo que falta probar" height="26"/></p>
 
 - **A batería:** que el latch la mantenga prendida al soltar PWR, el apagado completo y el deep sleep.
 - La **lectura de batería**, que no está calibrada contra una medición real.
@@ -189,9 +189,9 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 * * *
 
 <a id="hardware"></a>
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/hardware.png" alt="Hardware" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/hardware.png" alt="Hardware" width="100%"/></p>
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-necesario.png" alt="Necesario" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-necesario.png" alt="Necesario" height="26"/></p>
 
 | Pieza | Para qué |
 |---|---|
@@ -201,7 +201,7 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 | Cable esmaltado fino | Para puentear la radio a la placa |
 | **Encoder rotativo EC11** con pulsador | Para moverte por el Inicio y las carátulas, y el teclado en pantalla. Hay que desoldar el codec ES8311 |
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-opcional.png" alt="Opcional" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-opcional.png" alt="Opcional" height="26"/></p>
 
 | Pieza | Para qué |
 |---|---|
@@ -211,7 +211,7 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/como-se-hizo.png" alt="Cómo se hizo" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/como-se-hizo.png" alt="Cómo se hizo" width="100%"/></p>
 
 El proyecto se armó por etapas. Cada una se compiló y se probó antes de pasar a la siguiente.
 
@@ -227,14 +227,14 @@ header, DIO1/BUSY/RESET a los pads de la microSD. Con `SX126x init result 0` en 
 quedó andando. El módulo va pegado sobre el dorso de la placa, así que todo entra en la caja original.
 
 <p align="center">
-  <img src="variants/esp32s3/waveshare_epaper_154/img/piezas.jpg" alt="Placa Waveshare y Wio-SX1262 con los cables esmaltados soldados" width="60%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/piezas.jpg" alt="Placa Waveshare y Wio-SX1262 con los cables esmaltados soldados" width="60%"/>
 </p>
 <p align="center"><i>Las dos piezas antes de unirlas: la Waveshare y el Wio-SX1262 con los cables esmaltados ya soldados.</i></p>
 
 <p align="center">
-  <img src="variants/esp32s3/waveshare_epaper_154/img/cableado-placa.jpg" alt="Wio-SX1262 pegado al dorso de la placa, con el cableado" width="45%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/cableado-placa.jpg" alt="Wio-SX1262 pegado al dorso de la placa, con el cableado" width="45%"/>
   &nbsp;
-  <img src="variants/esp32s3/waveshare_epaper_154/img/armado-caja.jpg" alt="Placa con la radio dentro de la caja, con antena Seeed" width="38%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/armado-caja.jpg" alt="Placa con la radio dentro de la caja, con antena Seeed" width="38%"/>
 </p>
 <p align="center"><i>Izquierda: el módulo pegado al dorso. Derecha: todo dentro de la caja, con la antena flexible de Seeed (860–930 MHz).</i></p>
 
@@ -268,16 +268,16 @@ lo apretás. El firmware pone GPIO17 en alto apenas arranca, para sostenerla, y 
 * * *
 
 <a id="cableado"></a>
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/cableado.png" alt="Cableado" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/cableado.png" alt="Cableado" width="100%"/></p>
 
 Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cortar pistas.
 
 <p align="center">
-  <img src="variants/esp32s3/waveshare_epaper_154/img/cableado-esquema.jpg" alt="Cableado dibujado sobre el esquemático: microSD, header J1 y Wio-SX1262" width="55%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/cableado-esquema.jpg" alt="Cableado dibujado sobre el esquemático: microSD, header J1 y Wio-SX1262" width="55%"/>
 </p>
 <p align="center"><i>El cableado dibujado sobre el esquemático. Arriba, los pads de la microSD (TF1); al medio, el header J1; abajo, el Wio-SX1262.</i></p>
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-radio.png" alt="La radio" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-la-radio.png" alt="La radio" height="26"/></p>
 
 ```
   ┌──────────────┐                 ┌──────────────────────────┐
@@ -300,14 +300,14 @@ Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cor
 **Consola:** va por el USB nativo. No conectes adaptadores UART a GPIO43/44.
 **RF_SW:** GPIO3 comparte línea con el LED verde (vía 24K). Es normal que el LED reaccione.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-el-encoder.png" alt="El encoder" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-el-encoder.png" alt="El encoder" height="26"/></p>
 
 Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 
 <p align="center">
-  <img src="variants/esp32s3/waveshare_epaper_154/img/encoder-esquema.svg" alt="Diagrama: encoder EC11 a los pads 2, 6 y 8 del ES8311, común y pulsador a GND" width="48%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/encoder-esquema.svg" alt="Diagrama: encoder EC11 a los pads 2, 6 y 8 del ES8311, común y pulsador a GND" width="48%"/>
   &nbsp;
-  <img src="variants/esp32s3/waveshare_epaper_154/img/encoder-placa.jpg" alt="Encoder EC11 cableado con alambre esmaltado a los pads del codec" width="48%"/>
+  <img src="variants/esp32s3/calandria_mk1_epaper/img/encoder-placa.jpg" alt="Encoder EC11 cableado con alambre esmaltado a los pads del codec" width="48%"/>
 </p>
 <p align="center"><i>Izquierda: el cableado del encoder a los pads del codec. Derecha: así queda en la placa, con la radio arriba y la batería conectada.</i></p>
 
@@ -325,16 +325,16 @@ Primero desoldá el codec ES8311. El encoder va a los pads que deja libres.
 **Resistencias:** no hacen falta, se usan los pull-ups internos.
 **Si el giro va al revés:** intercambiá `ENCODER_PIN_A` y `ENCODER_PIN_B` en `variant.h`.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-gpio19-y-gpio20-no-tocar.png" alt="GPIO19 y GPIO20: no tocar" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-gpio19-y-gpio20-no-tocar.png" alt="GPIO19 y GPIO20: no tocar" height="26"/></p>
 
 Aparecen en el header y en la serigrafía como si fueran GPIO libres, pero **son el USB**. Si los
 usás para otra cosa, la placa queda sin forma práctica de reflashear.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/funciones.png" alt="Funciones" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/funciones.png" alt="Funciones" width="100%"/></p>
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-inicio.png" alt="Inicio" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-inicio.png" alt="Inicio" height="26"/></p>
 
 El MK1 arranca en el **Inicio**: cuatro carátulas, una por renglón, cada una con su resumen y un
 contador. Arriba, tu nombre corto, la batería (⚡ si está enchufada) y la hora.
@@ -348,7 +348,7 @@ contador. Arriba, tu nombre corto, la batería (⚡ si está enchufada) y la hor
 
 Nunca más de dos niveles: Inicio, carátula, y lo que abrís adentro.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-mensajes.png" alt="Mensajes" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-mensajes.png" alt="Mensajes" height="26"/></p>
 
 *Grupo* y *Público* primero, después un renglón por cada **directo**, con ● si hay sin leer. Al abrir
 una conversación ves cada mensaje con remitente, hora y saltos; los tuyos dicen **"✓ entregado"**,
@@ -356,7 +356,7 @@ una conversación ves cada mensaje con remitente, hora y saltos; los tuyos dicen
 **mensajes rápidos** cargados desde la app y al final "Escribir con el teclado". Un mensaje nuevo
 aparece solo en pantalla, y BOOT te devuelve a donde estabas.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-nodos.png" alt="Nodos" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-nodos.png" alt="Nodos" height="26"/></p>
 
 Todos los nodos, el último oído arriba, con distancia y rumbo ("1,2 km NO") y saltos. Los
 **perdidos** van tachados: un cliente a la hora sin oírlo, un router a las 13 horas, igual que en
@@ -368,7 +368,7 @@ mucho una vez por minuto. Si un directo falla por la clave, el aviso lo ofrece c
 cada tramo ("VOS -3 dB » BASE -8 dB » JUAN"), cuántos saltos hay y cuál es el tramo más flojo. Al
 final de la lista está el **Radar**: los 10 nodos más cercanos dibujados a escala.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-rumbo.png" alt="Rumbo" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-rumbo.png" alt="Rumbo" height="26"/></p>
 
 Se llama rumbo y no GPS porque el MK1 no tiene GPS: su posición la manda el celular. **Rastrear un
 nodo** muestra una flecha grande hacia él, la distancia y el rumbo ("NO 293°"); girando cambiás de
@@ -376,14 +376,14 @@ nodo. **Waypoints** los ordena del más cerca al más lejos y abre la misma brú
 **mapa del grupo** y **mi posición**, con hace cuánto la mandó el celular. La brújula va con el
 **norte arriba**: la placa no tiene magnetómetro, así que no simula una orientación que no existe.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-estado.png" alt="Estado" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-estado.png" alt="Estado" height="26"/></p>
 
 Cuatro recuadros: **batería** ("enchufada · cargando", "enchufada · llena" o "a batería"), **uso del
 canal**, **ambiente** (temperatura y humedad del SHTC3) y **firmware** (la versión, "al día" o "hay
 X.Y.Z" si CalandriApp avisó una más nueva). Abajo, **Ajustes** (ahorro de energía, girar pantalla, hora
 local, limpiar fantasmas, reiniciar y el menú completo), **WiFi**, **Bluetooth · PIN** y **Apagar**.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-wifi.png" alt="WiFi" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-wifi.png" alt="WiFi" height="26"/></p>
 
 Para dejar el MK1 en casa o en una base fija. **Con el WiFi prendido el Bluetooth se apaga**: en el
 ESP32 no andan juntos, así que la app no se puede conectar. La red y la clave se cargan desde la app;
@@ -392,12 +392,12 @@ hora por internet. Si no conecta en 3 minutos, el Inicio ofrece apagarlo con un 
 la pantalla, **mantener apretada la perilla al prenderlo** arranca con el WiFi apagado y el
 Bluetooth andando.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-teclado-en-pantalla.png" alt="Teclado en pantalla" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-teclado-en-pantalla.png" alt="Teclado en pantalla" height="26"/></p>
 
 Girás para recorrer las letras, apretás el encoder para elegir y BOOT envía. Tiene minúsculas,
 mayúsculas, números, símbolos, espacio y borrar.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-controles.png" alt="Controles" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-controles.png" alt="Controles" height="26"/></p>
 
 Los mismos gestos en todas las pantallas:
 
@@ -413,7 +413,7 @@ Los mismos gestos en todas las pantallas:
 * * *
 
 <a id="flashear"></a>
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/flashear.png" alt="Flashear" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/flashear.png" alt="Flashear" width="100%"/></p>
 
 1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest).
 2. **Mantené BOOT apretado mientras enchufás el USB** (modo descarga).
@@ -426,23 +426,23 @@ esptool --chip esp32s3 --port COM5 write-flash 0x0 firmware-calandria-mk1-epaper
 
 ¿Sin Python? Usá [ESP Tool](https://espressif.github.io/esptool-js/) en Chrome o Edge, con la dirección `0x0`.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-primer-arranque.png" alt="Primer arranque" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-primer-arranque.png" alt="Primer arranque" height="26"/></p>
 
 Emparejá el nodo con CalandriApp o con la app de Meshtastic y **configurá la región LoRa** antes que
 nada. Tu posición la toma del celular por Bluetooth.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-a-bateria.png" alt="A batería" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-a-bateria.png" alt="A batería" height="26"/></p>
 
 Mantené **PWR apretado 1 o 2 segundos** hasta que aparezca la pantalla. Es el latch de
 alimentación, es normal.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-actualizar.png" alt="Actualizar" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-actualizar.png" alt="Actualizar" height="26"/></p>
 
 Para actualizar sin perder la configuración, flasheá el `.bin` que no es factory en `0x10000`.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/compilar-desde-el-codigo.png" alt="Compilar desde el código" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/compilar-desde-el-codigo.png" alt="Compilar desde el código" width="100%"/></p>
 
 ```sh
 # Instalá PlatformIO, cloná este repo y:
@@ -450,35 +450,35 @@ pio run -e calandria-mk1-epaper             # build normal, con pantalla
 pio run -e calandria-mk1-epaper-headless    # solo radio, para aislar problemas
 ```
 
-El código de la variante está en [`variants/esp32s3/waveshare_epaper_154/`](variants/esp32s3/waveshare_epaper_154/).
+El código de la variante está en [`variants/esp32s3/calandria_mk1_epaper/`](variants/esp32s3/calandria_mk1_epaper/).
 El banner y los títulos de este README salen de `tools/readme_art.py`, con la misma marca y paleta que CalandriApp.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/lo-que-viene.png" alt="Lo que viene" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/lo-que-viene.png" alt="Lo que viene" width="100%"/></p>
 
 El Calandria MK1 de hoy es la placa en su caja original con la radio puenteada. Lo que sigue lo
 convierte en un equipo terminado:
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-gps.png" alt="GPS" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-gps.png" alt="GPS" height="26"/></p>
 
 Un **NEO-6M** (GY-NEO6MV2) en el conector del touch, libre en esta versión: TX del GPS a GPIO21,
 RX a GPIO7. Posición propia sin depender del celular, y la brújula usando el rumbo del GPS cuando
 hay movimiento.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-bateria-18650.png" alt="Batería 18650" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-bateria-18650.png" alt="Batería 18650" height="26"/></p>
 
 Una **18650 integrada**, con su módulo de carga **TP4056**, para muchas más horas de uso en el campo.
 Antes: validar a batería el latch, el apagado completo y el deep sleep, y calibrar la lectura de batería.
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-carcasa-3d.png" alt="Carcasa 3D" height="26"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/s-carcasa-3d.png" alt="Carcasa 3D" height="26"/></p>
 
 Cuando estén el GPS y la 18650 con su TP4056, se va a **diseñar una carcasa impresa en 3D** que aloje
 la placa, la radio, la batería, el GPS, la antena y el encoder.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/problemas-conocidos.png" alt="Problemas conocidos" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/problemas-conocidos.png" alt="Problemas conocidos" width="100%"/></p>
 
 | Problema | Solución |
 |---|---|
@@ -491,7 +491,7 @@ la placa, la radio, la batería, el GPS, la antena y el encoder.
 
 * * *
 
-<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/creditos-marcas-y-licencias.png" alt="Créditos, marcas y licencias" width="100%"/></p>
+<p><img src="variants/esp32s3/calandria_mk1_epaper/img/readme/titulos/creditos-marcas-y-licencias.png" alt="Créditos, marcas y licencias" width="100%"/></p>
 
 - **powered by Meshtastic®.** Meshtastic® es una marca registrada de Meshtastic LLC. Este proyecto se
   basa en el [firmware de Meshtastic](https://github.com/meshtastic/firmware) y en InkHUD. Es un proyecto

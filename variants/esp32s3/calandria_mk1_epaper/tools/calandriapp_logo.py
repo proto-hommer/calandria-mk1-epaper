@@ -11,7 +11,7 @@ Outputs:
   - the same preview zoomed x4
 
 Usage (Windows, from the repo root):
-  python variants/esp32s3/waveshare_epaper_154/tools/calandriapp_logo.py ^
+  python variants/esp32s3/calandria_mk1_epaper/tools/calandriapp_logo.py ^
       %USERPROFILE%/Downloads/calandriapp-marca.svg --userprefs userPrefs.jsonc
 Requires: pip install pillow
 """
