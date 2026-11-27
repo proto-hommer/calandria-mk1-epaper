@@ -10,6 +10,11 @@
 
 *[Leer en español](README.es.md)*
 
+[![Calandria](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=calandria&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) (alpha) | Meshtastic 2.8.3 | *powered by Meshtastic®*
+
+**New to this?** Start with [If you're new here](#if-youre-new-here): what LoRa is, what a mesh network
+is, what Meshtastic is, what the MK1 is and what you need to build it, and why it has its own version.
+
 A custom Meshtastic variant for the **Waveshare ESP32-S3-ePaper-1.54** (V2, no touch) with a
 **Seeed Wio-SX1262 for XIAO** LoRa module wired by hand. It uses InkHUD on the 1.54" e-paper and
 adds an EC11 rotary encoder with its own UI: a home screen with four cards (messages, nodes,
@@ -21,6 +26,113 @@ heading and status), conversations, signal measurement, compasses, a radar of ne
 > prototype and parts are untested (mainly on battery). Once the **GPS module** and an integrated
 > **18650 battery with its TP4056 charger** are in, a **3D-printed enclosure** will be designed.
 > Companion app: [CalandriApp](https://github.com/proto-hommer/calandriapp).
+
+## If you're new here
+
+If you have never heard of LoRa or Meshtastic, start here: in five minutes you will know what all this
+is, what the MK1 is and what you need.
+
+### The idea
+
+Small radio devices called **nodes** that pass text messages and positions to each other **with no
+internet, no cell signal and no subscription**. They are for trips to the countryside or the
+mountains, for keeping a group in touch where there is no signal, or for when everything goes down.
+The **Calandria MK1** is one of those nodes, pocket-sized and with a screen: you can use it on its own,
+with the knob, or from your phone with [CalandriApp](https://github.com/proto-hommer/calandriapp).
+
+### What LoRa is
+
+**LoRa** (*Long Range*) is a way of transmitting by radio made to send **a little data very far, using
+very little battery**. Think of a walkie-talkie that sends text messages instead of voice:
+
+- **It reaches far:** 1 to 5 km in a city, 10 to 20 km with a clear view, and over 100 km between
+  high hills. What matters most is how high the antenna is and what is in between.
+- **It uses little power:** a node lasts days on a small battery.
+- **It is slow:** it carries a short message (about 200 characters) or a position; no photos, audio or
+  calls.
+- **It is free to use:** it works on a radio band that needs no license or subscription. In Argentina
+  that is 915 to 928 MHz, which Meshtastic calls the **ANZ** region (other countries use other bands).
+
+On the MK1, the LoRa radio is the **Seeed Wio-SX1262** wired to the board (see [Wiring](#wiring)).
+
+### What a mesh network is
+
+*Mesh* means a net. A mesh network has no central tower and no company in the middle: **every node
+repeats what it hears**, so a message hops from one node to the next until it arrives.
+
+    You ───► node on a hill ───► a neighbour's node ───► your friend
+                 1st hop               2nd hop
+
+- Each repeat is a **hop**. A message makes at most 3 hops (it can be raised to 7).
+- The more nodes around, the farther everything reaches. A fixed node on a roof or a hill (a
+  **repeater**) helps everyone who can hear it.
+- If a node goes off, the others keep repeating: there is no single point that brings it all down.
+
+### What Meshtastic is
+
+[Meshtastic](https://meshtastic.org) is a free, open project that turns cheap LoRa boards into nodes of
+a mesh network. It has three parts: **the firmware** (the program that runs inside the node;
+installing it is called **flashing**), **the network** (all Meshtastic nodes understand each other,
+whoever owns them) and **the apps** that talk to the node (the official one and others, like
+CalandriApp). Messages travel **encrypted**: there is a public channel (LongFast) and you can create
+private channels with their own key.
+
+**Meshtastic does not support the MK1's board out of the box**, and that is why this repository exists:
+it is Meshtastic's firmware with a variant of its own for this board and an interface to drive it with
+the knob.
+
+### What you need
+
+1. **The parts** in [Hardware](#hardware): the Waveshare ESP32-S3-ePaper-1.54 board, the Seeed
+   Wio-SX1262 module with its antenna, the encoder and wires. A few wires have to be **soldered** (see
+   [Wiring](#wiring)).
+2. **Flash the firmware** from Chrome or Edge with the
+   [Calandria Flasher](https://proto-hommer.github.io/calandria-flasher/): plug it in by USB and press a
+   button. Nothing to install (more in [Flashing](#flashing-a-prebuilt-release)).
+3. **The antenna always on** while it is powered: transmitting without an antenna can burn the radio.
+4. **Optional, an Android phone** with [CalandriApp](https://github.com/proto-hommer/calandriapp): the
+   MK1 has no GPS yet, so the phone gives it its position; the app also sets up the group and edits the
+   canned messages. It works with the official Meshtastic app too.
+5. To talk to others, **they need a Meshtastic node too** (any node, not necessarily an MK1) on the same
+   group.
+
+### Words you will see
+
+| Word | What it means |
+|---|---|
+| **Node** | Each radio device in the network. The MK1 is one. |
+| **Hop** | Each time another node repeats your message. "Direct" = it heard you with nobody in between. |
+| **Channel** | A chat "room" with its own key. The group is a private channel. |
+| **Repeater** or **router** | A fixed node, placed high, that is there to repeat everyone else's messages. |
+| **Role** | How a node behaves: handheld (client), repeater (router), base… |
+| **RSSI** / **SNR** | How strong (dBm: −60 very strong, −120 at the limit) and how clean (dB: positive is good, below −15 at the limit) the signal arrived. |
+| **Firmware** / **flashing** | The node's program / installing it. |
+| **e-paper** | An "electronic ink" screen, like an e-reader's: readable in the sun, and it uses no power while it doesn't change. |
+| **InkHUD** | Meshtastic's interface for e-paper screens, which the MK1's is built on. |
+| **Encoder** | The knob: turn it to move, press it to choose. |
+| **Alpha** | A prototype under development: it works, but anything can change. |
+
+### The Calandria family and its versions
+
+Calandria is a few projects used together, but each one works on its own and moves at its own pace:
+
+| Project | What it is | Latest version |
+|---|---|---|
+| [**CalandriApp**](https://github.com/proto-hommer/calandriapp) | The Android app. Works with **any** Meshtastic node with Bluetooth. | [![app](https://img.shields.io/github/v/release/proto-hommer/calandriapp?label=&color=2ea44f)](https://github.com/proto-hommer/calandriapp/releases/latest) |
+| **Calandria MK1 epaper** (this repository) | A handmade pocket node with an e-paper screen, and its firmware. | [![mk1](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) |
+| [**Calandria Flasher**](https://github.com/proto-hommer/calandria-flasher) | A web page that installs the MK1's firmware over USB, from Chrome or Edge. | [open](https://proto-hommer.github.io/calandria-flasher/) |
+| [**calandria-datos**](https://github.com/proto-hommer/calandria-datos) | The terrain and city data the app uses to estimate range. | — |
+
+**Why the MK1 has two numbers.** The firmware is **Meshtastic 2.8.3** with the Calandria changes on top.
+So there are two versions: Meshtastic's (2.8.3), which is what the node reports to the apps, and the
+**Calandria** one (the badge above), which counts our changes. CalandriApp reads both and tells you
+whether the MK1 is up to date. The app and the MK1 don't depend on each other, so each one has its own
+number.
+
+Versions are **X.Y.Z**: **Z** goes up with fixes, **Y** with new features and **X** with a big change.
+The MK1 is at **0.x** because it is still **alpha**: it reaches 1.0 once it has GPS, a battery and an
+enclosure. To update it, use the Calandria Flasher. The details of each version are in
+[Versions](#versions).
 
 ## Hardware
 

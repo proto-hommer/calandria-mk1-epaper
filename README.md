@@ -3,10 +3,13 @@
 **Un nodo Meshtastic de bolsillo con pantalla e-paper, armado con una placa Waveshare y un módulo LoRa
 de Seeed cableado a mano. Es el complemento de hardware de [CalandriApp](https://github.com/proto-hommer/calandriapp).**
 
-Versión **Calandria 0.9.0** (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
+Versión [![Calandria](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=calandria&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) (alpha) | Meshtastic 2.8.3 | [versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones) | *powered by Meshtastic®* | *[English README](variants/esp32s3/waveshare_epaper_154/README.md)*
 
 [![Descargar firmware](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=descargar%20firmware&color=2ea44f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest)
 ![Estado: alpha, en desarrollo](https://img.shields.io/badge/estado-alpha%2C%20en%20desarrollo-ff7a2f)
+
+**¿Nuevo en esto?** Empezá por [Si recién llegás](#si-recien-llegas): qué es LoRa, qué es una red mesh,
+qué es Meshtastic, qué es el MK1 y qué te hace falta para armarlo, y por qué tiene su propia versión.
 
 > [!WARNING]
 > **Esto está en alpha, en pleno desarrollo.** La radio, la pantalla y el encoder andan y se usan todos
@@ -21,6 +24,114 @@ Versión **Calandria 0.9.0** (alpha) | Meshtastic 2.8.3 | [versiones](variants/e
   <img src="variants/esp32s3/waveshare_epaper_154/img/radar.jpg" alt="Radar apuntando a un nodo a 2 km" width="45%"/>
 </p>
 <p align="center"><i>Izquierda: la lista de nodos (42 conocidos, 9 activos). Derecha: el radar apuntando a un nodo a 2 km. A la derecha de la caja, el encoder.</i></p>
+
+* * *
+
+<a id="si-recien-llegas"></a>
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/si-recien-llegas.png" alt="Si recién llegás" width="100%"/></p>
+
+Si nunca oíste hablar de LoRa ni de Meshtastic, empezá por acá: en cinco minutos sabés qué es todo
+esto, qué es el MK1 y qué te hace falta.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-idea.png" alt="La idea" height="26"/></p>
+
+Unos aparatos de radio chiquitos llamados **nodos**, que se pasan mensajes de texto y posiciones entre
+ellos **sin internet, sin señal de celular y sin pagar abono**. Sirven para salidas al campo o a la
+montaña, para coordinar un grupo donde no hay señal, o para cuando se corta todo. El **Calandria MK1**
+es uno de esos nodos, de bolsillo y con pantalla: se puede usar solo, con la perilla, o desde el celular
+con [CalandriApp](https://github.com/proto-hommer/calandriapp).
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-lora.png" alt="Qué es LoRa" height="26"/></p>
+
+**LoRa** (de *Long Range*, "largo alcance") es una forma de transmitir por radio pensada para mandar
+**pocos datos muy lejos, gastando muy poca batería**. Pensalo como un walkie-talkie que, en vez de voz,
+manda mensajes de texto:
+
+- **Llega lejos:** de 1 a 5 km en la ciudad, de 10 a 20 km con vista despejada, y más de 100 km entre
+  cerros altos. Lo que más importa es la altura de la antena y lo que haya en el medio.
+- **Gasta poco:** un nodo dura días con una batería chica.
+- **Es lento:** pasa un mensaje corto (unos 200 caracteres) o una posición; no fotos, audios ni llamadas.
+- **Es libre:** usa una banda de radio que no necesita licencia ni abono. En Argentina es la de
+  915 a 928 MHz, que Meshtastic llama región **ANZ**.
+
+En el MK1, la radio LoRa es el **Seeed Wio-SX1262** que va cableado a la placa (ver [Cableado](#cableado)).
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-una-red-mesh.png" alt="Qué es una red mesh" height="26"/></p>
+
+*Mesh* quiere decir malla. En una red mesh no hay una antena central ni una empresa en el medio:
+**cada nodo repite lo que oye**, y así un mensaje va saltando de uno a otro hasta llegar.
+
+    Vos ───► nodo en un cerro ───► nodo de un vecino ───► tu amigo
+                 1.er salto              2.º salto
+
+- Cada repetición es un **salto**. Un mensaje da como mucho 3 saltos (se puede subir hasta 7).
+- Cuantos más nodos haya en la zona, más lejos llega todo. Un nodo fijo en un techo o en un cerro (un
+  **repetidor**) ayuda a todos los que lo oyen.
+- Si un nodo se apaga, los demás siguen repitiendo: no hay un punto único que corte todo.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-es-meshtastic.png" alt="Qué es Meshtastic" height="26"/></p>
+
+[Meshtastic](https://meshtastic.org) es un proyecto libre y gratuito que convierte placas LoRa baratas
+en nodos de una red mesh. Tiene tres partes: **el firmware** (el programa que corre adentro del nodo;
+instalarlo es **flashear**), **la red** (todos los nodos Meshtastic se entienden entre sí, sean de quien
+sean) y **las apps** que hablan con el nodo (la oficial y otras, como CalandriApp). Los mensajes viajan
+**cifrados**: hay un canal público (LongFast) y se pueden crear canales privados con clave.
+
+**Meshtastic no trae soporte para la placa del MK1**, y por eso existe este repo: es el firmware de
+Meshtastic con una variante propia para esta placa y una interfaz para manejarla con la perilla.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-que-te-hace-falta.png" alt="Qué te hace falta" height="26"/></p>
+
+1. **Las piezas** de [Hardware](#hardware): la placa Waveshare ESP32-S3-ePaper-1.54, el módulo Seeed
+   Wio-SX1262 con su antena, el encoder y cables. Hay que **soldar** unos pocos cables
+   (ver [Cableado](#cableado)).
+2. **Flashear el firmware** desde Chrome o Edge con el
+   [Calandria Flasher](https://proto-hommer.github.io/calandria-flasher/): se enchufa por USB y es un
+   botón. No hace falta instalar nada (más detalle en [Flashear](#flashear)).
+3. **La antena siempre puesta** mientras esté prendido: transmitir sin antena puede quemar la radio.
+4. **Opcional, un celular Android** con [CalandriApp](https://github.com/proto-hommer/calandriapp): como
+   el MK1 todavía no tiene GPS, el celular le pasa la posición, y además arma el grupo y edita los
+   mensajes rápidos. También anda con la app oficial de Meshtastic.
+5. Para hablar con otros, que **ellos también tengan un nodo** Meshtastic (cualquiera, no hace falta
+   que sea un MK1) y estén en el mismo grupo.
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-palabras-que-vas-a-ver.png" alt="Palabras que vas a ver" height="26"/></p>
+
+| Palabra | Qué quiere decir |
+|---|---|
+| **Nodo** | Cada aparato de radio de la red. El MK1 es uno. |
+| **Salto** | Cada vez que otro nodo repite tu mensaje. "Directo" = te oyó sin intermediarios. |
+| **Canal** | Una "sala" de chat con su clave. El grupo es un canal privado. |
+| **Repetidor** o **router** | Un nodo fijo, puesto en alto, que está para repetir lo de los demás. |
+| **Rol** | Cómo se porta un nodo: de mano (cliente), repetidor (router), base… |
+| **RSSI** / **SNR** | Qué tan fuerte (dBm: −60 muy fuerte, −120 al límite) y qué tan limpia (dB: positivo es bueno, debajo de −15 al límite) llegó la señal. |
+| **Firmware** / **flashear** | El programa del nodo / instalárselo. |
+| **e-paper** | Pantalla de "tinta electrónica", como la de un lector de libros: se lee al sol y no gasta mientras no cambia. |
+| **InkHUD** | La interfaz de Meshtastic para pantallas e-paper, sobre la que está hecha la del MK1. |
+| **Encoder** | La perilla: se gira para moverse y se aprieta para elegir. |
+| **Alpha** | Prototipo en desarrollo: anda, pero puede cambiar cualquier cosa. |
+
+<p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-la-familia-calandria-y-sus-versiones.png" alt="La familia Calandria y sus versiones" height="26"/></p>
+
+Calandria son varios proyectos que se usan juntos, pero cada uno anda solo y va a su ritmo:
+
+| Proyecto | Qué es | Última versión |
+|---|---|---|
+| [**CalandriApp**](https://github.com/proto-hommer/calandriapp) | La app Android. Anda con **cualquier** nodo Meshtastic con Bluetooth. | [![app](https://img.shields.io/github/v/release/proto-hommer/calandriapp?label=&color=2ea44f)](https://github.com/proto-hommer/calandriapp/releases/latest) |
+| **Calandria MK1 epaper** (este repo) | Un nodo de bolsillo con pantalla e-paper, hecho a mano, y su firmware. | [![mk1](https://img.shields.io/github/v/release/proto-hommer/calandria-mk1-epaper?label=&color=ff7a2f)](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest) |
+| [**Calandria Flasher**](https://github.com/proto-hommer/calandria-flasher) | Una página web para instalarle el firmware al MK1 por USB, desde Chrome o Edge. | [abrir](https://proto-hommer.github.io/calandria-flasher/) |
+| [**calandria-datos**](https://github.com/proto-hommer/calandria-datos) | Los datos de monte y ciudad que usa la app para calcular el alcance. | — |
+
+**Por qué el MK1 tiene dos números.** El firmware es **Meshtastic 2.8.3** con los cambios del Calandria
+encima. Por eso hay dos versiones: la de Meshtastic (2.8.3), que es lo que el nodo les informa a las
+apps, y la del **Calandria** (la del badge de arriba), que cuenta nuestros cambios. CalandriApp lee las
+dos y te avisa si el MK1 está al día. La app y el MK1 no dependen uno del otro, así que cada uno lleva
+su número.
+
+Se numera **X.Y.Z**: **Z** sube con los arreglos, **Y** con funciones nuevas y **X** con un cambio
+grande. El MK1 va por la **0.x** porque todavía es **alpha**: llega a 1.0 cuando tenga GPS, batería y
+carcasa. Para actualizarlo, el Calandria Flasher. El detalle de cada versión está en
+[versiones](variants/esp32s3/waveshare_epaper_154/README.es.md#versiones).
 
 * * *
 
@@ -77,6 +188,7 @@ También anda con la app oficial de Meshtastic, como cualquier nodo.
 
 * * *
 
+<a id="hardware"></a>
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/hardware.png" alt="Hardware" width="100%"/></p>
 
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/s-necesario.png" alt="Necesario" height="26"/></p>
@@ -155,6 +267,7 @@ lo apretás. El firmware pone GPIO17 en alto apenas arranca, para sostenerla, y 
 
 * * *
 
+<a id="cableado"></a>
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/cableado.png" alt="Cableado" width="100%"/></p>
 
 Toda la radio va al **header J1** y a los **pads de la microSD**. No hay que cortar pistas.
@@ -297,6 +410,7 @@ Los mismos gestos en todas las pantallas:
 
 * * *
 
+<a id="flashear"></a>
 <p><img src="variants/esp32s3/waveshare_epaper_154/img/readme/titulos/flashear.png" alt="Flashear" width="100%"/></p>
 
 1. Bajá el `…factory.bin` del [último release](https://github.com/proto-hommer/calandria-mk1-epaper/releases/latest).
